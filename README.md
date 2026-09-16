@@ -4,17 +4,20 @@ Reproducible discovery engine for unusual structure in the dopaminergic neighbor
 
 The workflow is intentionally practical: commit code, let GitHub Actions fetch/process the pinned connectome, then inspect candidate findings and real 3D MaleCNS anatomy on the project's own GitHub Pages site.
 
-## v0.2.1
+## v0.3.0
 
-v0.2.1 keeps the peer-aware/statistical work from v0.2 and fixes the 3D runtime. v0.2 replaces the first broad anomaly screen with comparisons that are harder to fool:
+v0.3 keeps the peer-aware discovery/statistics from v0.2 and turns the 3D page into a usable research viewer:
 
 - dopamine identity is `consensus_nt == dopamine`;
-- neuron outliers are compared against the **same exact MaleCNS type**, not against the whole dopamine population;
-- exact left/right pairs and multi-neuron left/right type groups are screened separately;
-- convergence is tested with a global mixing null that holds the target's full traced in-degree fixed;
-- FDR correction is conservative against the full traced target universe, not just targets already hit by dopamine neurons;
-- the site is a minimal grayscale research dashboard;
-- the 3D view uses **official MaleCNS neuron centerline skeletons** over a lightweight LOD deterministically derived in CI from official MaleCNS neuropil meshes.
+- exact-type peer outliers, bilateral asymmetry and degree-controlled dopamine-input enrichment remain the discovery layer;
+- the viewer prefers the official MaleCNS `fullbrain-major-shells` central-brain/optic-lobe geometry instead of drawing 80 overlapping ROI surfaces;
+- a deterministic CI-built LOD is shipped to the browser while source URLs, hashes and source triangle counts remain in provenance;
+- official MaleCNS neuron centerline skeletons are loaded focus-first;
+- natural grab-style orbit, pan, zoom, anatomical camera presets, `fit neuron` and `fit brain` are available;
+- brain and context opacity are adjustable, with a clipping control for looking inside the shell;
+- camera state and finding selection can be preserved in the URL;
+- for direct dopamine-input findings, CI makes a best-effort anonymous neuPrint query for the **real pre/post synapse positions** and overlays them as points;
+- synapse-overlay failure is fail-soft and never turns a valid discovery run red.
 
 A candidate is a lead, not a biological conclusion. The current convergence null controls for generic target degree but **not yet for neuropil/anatomical availability**.
 
@@ -24,10 +27,10 @@ The generated site contains only four views:
 
 `overview` → run counts + highest candidates  
 `findings` → dense filterable candidate table  
-`3d specimen` → real MaleCNS regional meshes + real selected neuron skeletons  
+`3d specimen` → real MaleCNS shell + selected real neuron skeletons + applicable synapse sites  
 `run` → exact commit, hashes and scope
 
-The 3D viewer does not invent neuron-to-neuron geometry. It highlights published neuron centerlines. Connectivity between neurons remains a graph-table fact unless synapse coordinates are explicitly added in a later experiment.
+The 3D viewer does not invent neuron-to-neuron lines. Visible neurites are published MaleCNS centerlines. Synapse dots, when present, are queried from the MaleCNS neuPrint dataset and are shown only for findings that assert direct connectivity.
 
 ## Real MaleCNS run
 
@@ -42,21 +45,24 @@ dsc run \
   --config configs/discovery.yml \
   --output build/research \
   --site-template site
-dsc geometry-manifest --output build/research/site/data/geometry.json
+
+dsc geometry-manifest \
+  --output build/research/site/data/geometry.json \
+  --vendor-dir build/research/site/data/geometry \
+  --findings build/research/findings.json
+
+dsc synapse-sites \
+  --findings build/research/findings.json \
+  --output build/research/site/data/synapses.json
 ```
 
 Normally you do not run this locally. Use **Actions → Update MaleCNS dopamine snapshot**. GitHub Actions caches the upstream flat-connectome files and deploys the finished site to GitHub Pages.
 
 ## 3D data provenance
 
-The site loads geometry from official FlyEM/Janelia public storage:
+The viewer reads geometry from official FlyEM/Janelia public storage. The preferred context is `fullbrain-major-shells` segments 1–3 (central brain and both optic lobes); if that source cannot be built, the workflow falls back to the optimized `fullbrain-roi-v5` route from v0.2.1. Neuron centerlines come from `v1.0/segmentation/skeletons-malecns/skeletons-precomputed/`.
 
-- neuropil region meshes: `gs://flyem-male-cns/rois/fullbrain-roi-v5/mesh/`
-- neuron centerline skeletons: `gs://flyem-male-cns/v1.0/segmentation/skeletons-malecns/skeletons-precomputed/`
-
-Both share MaleCNS EM coordinates. Geometry is not copied from another visualization website. During the heavy workflow, GitHub Actions caches the official full-resolution region meshes, records their source hashes, and derives a low-detail browser surface from original MaleCNS surface vertices. Full multi-million-triangle ROI meshes are not shipped to the browser. A bounded, focus-first set of finding skeletons is copied unchanged; other contextual skeletons can stream from the same official public endpoint. `geometry.json` retains authoritative source URLs/hashes plus LOD hashes and triangle counts.
-
-MaleCNS data are CC BY. Project code is MIT.
+The source meshes are never altered in the cache. CI records source hashes, derives a deterministic display LOD, and ships only that lightweight geometry to Pages. MaleCNS data are CC BY. Project code is MIT.
 
 ## Development
 

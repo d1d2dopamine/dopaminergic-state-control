@@ -50,7 +50,16 @@ jobs:
             --source-cache-dir "${{ runner.temp }}/male-cns-geometry-v1" \
             --findings build/research/findings.json \
             --max-vendored-skeletons 128 \
-            --region-lod-divisions 20
+            --region-lod-divisions 20 \
+            --shell-lod-divisions 46
+      - name: Fetch real synapse positions for direct-connectivity findings
+        continue-on-error: true
+        run: |
+          dsc synapse-sites \
+            --findings build/research/findings.json \
+            --output build/research/site/data/synapses.json \
+            --max-sources 8 \
+            --max-points 2500
       - uses: actions/upload-artifact@v4
         with:
           name: male-cns-v1.0-dopamine-research

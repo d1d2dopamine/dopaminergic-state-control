@@ -68,3 +68,13 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 12px; b
 }
 #brain-canvas { touch-action: none; contain: strict; }
 .viewer-wrap { overflow: hidden; }
+.range { width: 100%; min-width: 0; padding: 0; accent-color: #aaa; }
+.viewer-toolbar-main { top: 10px; }
+.viewer-toolbar-views { top: 48px; }
+.orientation-gizmo { position: absolute; right: 12px; bottom: 12px; width: 82px; height: 82px; border: 1px solid #343434; background: rgba(8,8,8,.72); color: #8f8f8f; pointer-events: none; font-size: 10px; }
+.orientation-gizmo::before { content: ''; position: absolute; left: 40px; top: 10px; bottom: 10px; border-left: 1px solid #4a4a4a; }
+.orientation-gizmo::after { content: ''; position: absolute; top: 40px; left: 10px; right: 10px; border-top: 1px solid #4a4a4a; }
+.orientation-gizmo span { position: absolute; z-index: 1; background: rgba(8,8,8,.78); padding: 0 2px; }
+.gizmo-l { left: 5px; top: 34px; }.gizmo-r { right: 5px; top: 34px; }.gizmo-d { left: 35px; top: 4px; }.gizmo-v { left: 35px; bottom: 4px; }.gizmo-ap { left: 29px; top: 34px; color: #b0b0b0; }
+.swatch.synapse { height: 5px; width: 5px; border-radius: 50%; background: #e8e8e8; justify-self: center; }
+@media (max-width: 1050px) { .viewer-toolbar { max-width: calc(100% - 20px); flex-wrap: wrap; justify-content: flex-end; } .viewer-toolbar-views { top: 82px; } }

@@ -1,3 +1,33 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3D specimen — Dopaminergic State Control</title><link rel="stylesheet" href="assets/styles.css"></head>
 <body data-page="network"><header><strong>dopaminergic-state-control</strong><nav><a href="index.html">overview</a><a href="findings.html">findings</a><a href="network.html" aria-current="page">3d specimen</a><a href="runs.html">run</a></nav></header>
-<div class="viewer-layout"><aside class="viewer-sidebar"><h1>3D MaleCNS specimen</h1><p class="muted">Official neuron skeletons over a deterministic low-detail rendering derived from official MaleCNS ROI surfaces.</p><label for="network-finding">finding</label><select id="network-finding"></select><dl class="kv" id="network-kv"></dl><p id="network-detail"></p><div class="legend"><div class="legend-row"><span class="swatch region"></span><span>MaleCNS ROI surface context (LOD)</span></div><div class="legend-row"><span class="swatch related"></span><span>related real neuron skeletons</span></div><div class="legend-row"><span class="swatch focus"></span><span>focus real neuron skeleton</span></div></div><hr><p class="muted">The browser does not receive the multi-million-triangle source meshes. CI derives a lightweight display mesh while retaining source URLs and SHA-256 hashes. Visible neurites are published MaleCNS centerlines; no invented connection geometry is drawn.</p></aside><section class="viewer-wrap"><canvas id="brain-canvas"></canvas><div class="viewer-toolbar"><button id="toggle-regions">regions: on</button><button id="toggle-related">context: off</button><button id="fit-neuron">fit neuron</button><button id="fit-brain">fit brain</button></div><div class="viewer-overlay" id="viewer-status">initializing WebGL…</div></section></div><script src="assets/app.js"></script><script src="assets/brain.js"></script></body></html>
+<div class="viewer-layout">
+<aside class="viewer-sidebar">
+  <h1>3D MaleCNS specimen</h1>
+  <p class="muted">Official MaleCNS anatomical shell + official neuron centerlines. Direct-connectivity findings can additionally show real neuPrint synapse sites.</p>
+  <label for="network-finding">finding</label><select id="network-finding"></select>
+  <dl class="kv" id="network-kv"></dl><p id="network-detail"></p>
+  <hr>
+  <label for="brain-opacity">brain opacity <span id="brain-opacity-value">7%</span></label><input class="range" id="brain-opacity" type="range" min="0" max="30" value="7" step="1">
+  <label for="context-opacity">context opacity <span id="context-opacity-value">55%</span></label><input class="range" id="context-opacity" type="range" min="5" max="100" value="55" step="5">
+  <label for="clip-depth">clip front <span id="clip-depth-value">off</span></label><input class="range" id="clip-depth" type="range" min="0" max="95" value="0" step="1">
+  <div class="legend">
+    <div class="legend-row"><span class="swatch region"></span><span>anatomical context shell</span></div>
+    <div class="legend-row"><span class="swatch related"></span><span>related / comparison skeletons</span></div>
+    <div class="legend-row"><span class="swatch focus"></span><span>focus skeleton</span></div>
+    <div class="legend-row"><span class="swatch synapse"></span><span>real synapse sites (when applicable)</span></div>
+  </div>
+  <hr>
+  <p class="muted">Controls: drag = orbit; Shift/Right/Middle drag = pan; wheel = zoom; double-click = fit neuron. No invented 3D connection lines are drawn.</p>
+</aside>
+<section class="viewer-wrap">
+  <canvas id="brain-canvas"></canvas>
+  <div class="viewer-toolbar viewer-toolbar-main">
+    <button id="toggle-regions">brain: on</button><button id="toggle-related">context: off</button><button id="toggle-synapses">synapses: on</button><button id="fit-neuron">fit neuron</button><button id="fit-brain">fit brain</button><button id="copy-view">copy view</button>
+  </div>
+  <div class="viewer-toolbar viewer-toolbar-views">
+    <button data-view="anterior">anterior</button><button data-view="posterior">posterior</button><button data-view="dorsal">dorsal</button><button data-view="ventral">ventral</button><button data-view="left">left</button><button data-view="right">right</button>
+  </div>
+  <div class="orientation-gizmo" id="orientation-gizmo"><span class="gizmo-l">L</span><span class="gizmo-r">R</span><span class="gizmo-d">D</span><span class="gizmo-v">V</span><span class="gizmo-ap">A/P</span></div>
+  <div class="viewer-overlay" id="viewer-status">initializing WebGL…</div>
+</section>
+</div><script src="assets/app.js"></script><script src="assets/brain.js"></script></body></html>
