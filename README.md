@@ -4,9 +4,23 @@ Reproducible discovery engine for unusual structure in the dopaminergic neighbor
 
 The practical loop is: commit code → GitHub Actions fetches/processes the pinned connectome → statistical controls run → the project site shows a review queue and real 3D MaleCNS anatomy.
 
-## v0.4.0 — scientific filtering
+## v0.4.1 — Experiment 001 / State Lab
 
 v0.4 shifts the project from broad anomaly discovery toward candidates that survive explicit attempts to explain them away.
+
+`v0.4.1` keeps the v0.4 scientific filtering layer and adds the first mechanistic follow-up instead of expanding the generic detector surface.
+
+- **Experiment 001 — PAM04 input specialization** is generated automatically from the same pinned MaleCNS snapshot and exact discovery results;
+- all PAM04 cells receive a compact structural dossier with exact-type metrics, strongest partners and aggregated upstream/downstream cell-type channels;
+- the research site gains a **State Lab** for real-vs-counterfactual comparison (`real`, `knockout`, `medianize`, `amplify`, deterministic `shuffle`);
+- browser dynamics are a normalized phenomenological rate model, clearly separated from measured connectome structure;
+- the State Lab exposes exploratory dopamine tone, DAT clearance and `Dop1R1` / `Dop1R2` / `Dop2R` response channels without pretending that MaleCNS contains per-target receptor abundance;
+- every browser state can be exported as JSON; committed JSON files under `experiments/001_pam04/scenarios/` are reproduced by GitHub Actions against the fresh experiment data;
+- State Lab links directly to the real 3D skeleton of the selected PAM04 cell.
+
+The dynamic/receptor layer is a sensitivity sandbox, not a claim about measured firing, receptor concentration or behavior. A useful result is one that survives structural controls and remains stable across reasonable model parameters.
+
+### v0.4 scientific filtering retained
 
 - dopamine identity remains `consensus_nt == dopamine`;
 - the bounded snapshot now retains one-hop dopamine edges down to weight 1, while the primary analysis threshold stays configurable (default 3);
@@ -27,6 +41,7 @@ A candidate is still a lead, not a mechanism. ROI overlap is a necessary anatomi
 
 `overview` → run counts + current review queue  
 `findings` → filterable candidates with control status, robustness, null model and optional spatial synapse evidence  
+`state lab` → Experiment 001 PAM04 dossier + counterfactual simulation + receptor sandbox  
 `3d specimen` → official MaleCNS shell + real selected neuron skeletons + applicable synapse sites  
 `run` → exact commit, hashes, thresholds and data scope
 

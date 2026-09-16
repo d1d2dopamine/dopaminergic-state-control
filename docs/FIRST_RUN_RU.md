@@ -15,3 +15,13 @@
 Если ROI metadata доступны, dopamine-input findings используют ROI-overlap availability null. Если нет — соответствующая карточка будет `global_only`, а не замаскирована под anatomy-controlled result.
 
 3D остался инструментом проверки: серый прозрачный brain shell, реальные skeletons и, где применимо, реальные synapse sites.
+
+## Experiment 001 / State Lab
+
+Начиная с v0.4.1 реальный heavy-run автоматически строит `Experiment 001 — PAM04 input specialization`.
+
+После зелёной сборки открой `state lab` на GitHub Pages. Там можно выбрать PAM04-кандидата, реальный upstream cell-type channel и сравнить исходную структуру с `knockout`, `medianize`, `amplify` или детерминированным `shuffle`.
+
+Ползунки `dopamine tone`, `DAT clearance`, `Dop1R1`, `Dop1R2`, `Dop2R` относятся к модельному слою, а не к измеренным значениям конкретных клеток. Это специально подписано на сайте.
+
+Если комбинация параметров выглядит интересной, нажми **export run JSON** и положи файл в `experiments/001_pam04/scenarios/`. Следующий `Update MaleCNS dopamine snapshot` воспроизведёт этот JSON уже в Python/CI и положит результат в research artifact и на сайт в список committed CI scenarios.

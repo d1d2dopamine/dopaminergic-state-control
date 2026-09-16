@@ -7,6 +7,7 @@ from .geometry import build_geometry_manifest
 from .malecns import build_dopamine_snapshot
 from .pipeline import run_pipeline
 from .synapses import build_synapse_site_manifest
+from .state_model import run_scenario_file
 
 
 def main() -> None:
@@ -44,6 +45,11 @@ def main() -> None:
     syn.add_argument("--max-sources", type=int, default=24)
     syn.add_argument("--max-points", type=int, default=4000)
     syn.add_argument("--spatial-permutations", type=int, default=400)
+
+    sim = sub.add_parser("pam04-simulate", help="Reproduce a committed Experiment 001 State Lab scenario")
+    sim.add_argument("--experiment", required=True, help="Generated experiment_001_pam04.json")
+    sim.add_argument("--scenario", required=True, help="Scenario JSON exported from State Lab or written by hand")
+    sim.add_argument("--output", required=True)
 
     args = parser.parse_args()
     if args.command == "run":
@@ -92,6 +98,9 @@ def main() -> None:
             "total_points": payload["total_points"],
             "findings": len(payload["findings"]),
         }, indent=2))
+    elif args.command == "pam04-simulate":
+        payload = run_scenario_file(args.experiment, args.scenario, args.output)
+        print(json.dumps(payload["summary"], indent=2))
 
 
 if __name__ == "__main__":

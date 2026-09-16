@@ -4,6 +4,7 @@ import copy
 from pathlib import Path
 
 from .discovery import discover
+from .experiment_pam04 import build_pam04_experiment
 from .io import load_config, load_snapshot, load_snapshot_meta, write_json
 from .provenance import make_manifest
 from .site import build_site
@@ -51,5 +52,32 @@ def run_pipeline(
         "anatomical_null": "source outputRois intersect target inputRois when source metadata are available",
     }
     write_json(output / "run_manifest.json", manifest)
-    build_site(site_template, output / "site", nodes, edges, result.findings, result.features, result.core_ids, manifest)
+    pam04 = build_pam04_experiment(
+        nodes,
+        edges,
+        result.features,
+        result.findings,
+        min_synapses=int(config["dataset"].get("min_synapses", 1)),
+        top_input_channels=int(config.get("experiments", {}).get("pam04", {}).get("top_input_channels", 18)),
+        top_output_channels=int(config.get("experiments", {}).get("pam04", {}).get("top_output_channels", 14)),
+        top_partners_per_cell=int(config.get("experiments", {}).get("pam04", {}).get("top_partners_per_cell", 12)),
+    )
+    write_json(output / "experiment_001_pam04.json", pam04)
+    manifest.setdefault("experiments", {})["001_pam04"] = {
+        "available": bool(pam04.get("available")),
+        "cell_count": int(pam04.get("cell_count", 0) or 0),
+        "candidate_ids": pam04.get("candidate_ids", []),
+    }
+    write_json(output / "run_manifest.json", manifest)
+    build_site(
+        site_template,
+        output / "site",
+        nodes,
+        edges,
+        result.findings,
+        result.features,
+        result.core_ids,
+        manifest,
+        experiments={"001_pam04": pam04},
+    )
     return manifest

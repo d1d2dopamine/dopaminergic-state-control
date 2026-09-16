@@ -22,3 +22,9 @@ discovery:
   convergence_min_enrichment: 2.0
 site:
   title: Dopaminergic State Control
+
+experiments:
+  pam04:
+    top_input_channels: 18
+    top_output_channels: 14
+    top_partners_per_cell: 12

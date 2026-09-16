@@ -30,3 +30,21 @@ def test_findings_ui_exposes_v04_control_fields():
     assert 'ROI overlap' in app
     assert 'finding-status' in html
     assert 'survived_controls' in html
+
+
+def test_state_lab_is_reproducible_and_explicitly_model_based():
+    js = Path('site/assets/state-lab.js').read_text(encoding='utf-8')
+    html = Path('site/state-lab.html').read_text(encoding='utf-8')
+    assert 'candidate knockout' in html
+    assert 'medianize candidate inputs' in html
+    assert 'DAT clearance' in html
+    assert 'Dop1R1 gain' in html and 'Dop1R2 gain' in html and 'Dop2R gain' in html
+    assert 'export run JSON' in html
+    assert 'simulate(p' in js
+    assert "data/experiments/001_pam04.json" in js
+
+
+def test_3d_viewer_accepts_manual_state_lab_focus():
+    app = Path('site/assets/app.js').read_text(encoding='utf-8')
+    assert "params.get('focus')" in app
+    assert 'manual_focus' in app

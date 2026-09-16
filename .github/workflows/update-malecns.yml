@@ -44,6 +44,31 @@ jobs:
             --roi-cache "${{ runner.temp }}/male-cns-v1.0-roi-meta/roi-availability.json.gz"
       - name: Run peer-aware discovery and null tests
         run: dsc run --snapshot build/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/research --site-template site --min-synapses "${{ inputs.min_synapses }}"
+      - name: Reproduce committed Experiment 001 State Lab scenarios
+        shell: bash
+        run: |
+          mkdir -p build/research/experiments/001_pam04/runs
+          mkdir -p build/research/site/data/experiments/runs
+          for scenario in experiments/001_pam04/scenarios/*.json; do
+            [ -e "$scenario" ] || continue
+            name="$(basename "$scenario" .json)"
+            dsc pam04-simulate \
+              --experiment build/research/experiment_001_pam04.json \
+              --scenario "$scenario" \
+              --output "build/research/experiments/001_pam04/runs/${name}.json"
+            cp "build/research/experiments/001_pam04/runs/${name}.json" "build/research/site/data/experiments/runs/${name}.json"
+          done
+          python - <<'PYINDEX'
+          import json
+          from pathlib import Path
+          root=Path('build/research/experiments/001_pam04/runs')
+          rows=[]
+          for path in sorted(root.glob('*.json')):
+              payload=json.loads(path.read_text(encoding='utf-8'))
+              rows.append({'name':path.stem,'file':path.name,'parameters':payload.get('parameters',{}),'summary':payload.get('summary',{})})
+          out=Path('build/research/site/data/experiments/runs/index.json')
+          out.write_text(json.dumps(rows,indent=2),encoding='utf-8')
+          PYINDEX
       - name: Cache official MaleCNS ROI source meshes
         uses: actions/cache@v4
         with:
@@ -80,6 +105,10 @@ jobs:
               synapses = json.load(open('build/research/site/data/synapses.json', encoding='utf-8'))
           except FileNotFoundError:
               synapses = {'total_points': 0, 'findings': {}}
+          try:
+              pam04 = json.load(open('build/research/experiment_001_pam04.json', encoding='utf-8'))
+          except FileNotFoundError:
+              pam04 = {'available': False, 'candidate_ids': []}
           statuses = Counter(f.get('status', 'candidate') for f in findings)
           kinds = Counter(f.get('kind', 'unknown') for f in findings)
           queue = [f for f in findings if f.get('status') in {'survived_controls', 'survived_thresholds'}]
@@ -87,7 +116,7 @@ jobs:
           roi_meta = anatomical.get('roi_metadata', {})
           roi_after = roi_meta.get('after', {})
           lines = [
-              '# Dopaminergic State Control v0.4',
+              '# Dopaminergic State Control v0.4.1',
               '',
               f"- dopamine core: {manifest['counts'].get('dopamine_core_nodes', '—')}",
               f"- findings shown: {len(findings)}",
@@ -96,6 +125,8 @@ jobs:
               f"- ROI metadata: {roi_meta.get('source', 'unknown')}",
               f"- ROI output coverage: {float(roi_after.get('output_fraction', 0))*100:.1f}%",
               f"- targets with anatomical pool: {anatomical.get('snapshot_targets_with_anatomical_pool', 0)} / {anatomical.get('snapshot_nodes', 0)}",
+              f"- Experiment 001 PAM04: {'ready' if pam04.get('available') else 'unavailable'}",
+              f"- PAM04 candidates: {', '.join(str(x) for x in pam04.get('candidate_ids', [])) or 'none'}",
               '',
               '## Control states',
           ]

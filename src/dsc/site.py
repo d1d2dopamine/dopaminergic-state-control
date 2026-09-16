@@ -38,7 +38,8 @@ def _serialise_edges(edges: pd.DataFrame) -> list[dict]:
 
 
 def build_site(template_dir: str | Path, output_dir: str | Path, nodes: pd.DataFrame, edges: pd.DataFrame,
-               findings: list[dict], features: pd.DataFrame, core_ids: set[int], manifest: dict) -> None:
+               findings: list[dict], features: pd.DataFrame, core_ids: set[int], manifest: dict,
+               experiments: dict[str, dict] | None = None) -> None:
     src = Path(template_dir)
     dst = Path(output_dir)
     if dst.exists():
@@ -50,3 +51,5 @@ def build_site(template_dir: str | Path, output_dir: str | Path, nodes: pd.DataF
     write_json(data_dir / "review_queue.json", [f for f in findings if f.get("status") in {"survived_controls", "survived_thresholds"}])
     write_json(data_dir / "features.json", json.loads(features.to_json(orient="records")))
     write_json(data_dir / "run.json", manifest)
+    for experiment_id, payload in (experiments or {}).items():
+        write_json(data_dir / "experiments" / f"{experiment_id}.json", payload)

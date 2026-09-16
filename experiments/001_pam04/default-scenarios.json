@@ -1,0 +1,10 @@
+{
+  "experiment": "001_pam04",
+  "scenarios": [
+    {"name": "real", "mode": "real"},
+    {"name": "candidate knockout", "mode": "knockout"},
+    {"name": "medianized candidate inputs", "mode": "medianize"},
+    {"name": "dominant input x2", "mode": "amplify", "candidate_gain": 2.0},
+    {"name": "deterministic input shuffle", "mode": "shuffle"}
+  ]
+}

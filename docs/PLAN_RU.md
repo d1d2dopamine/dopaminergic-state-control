@@ -45,3 +45,18 @@
 2. Проверяем самые устойчивые 3–10 кандидатов на reconstruction/annotation артефакты.
 3. Для оставшихся делаем глубокий literature/preprint novelty search.
 4. Только после этого выбираем `Experiment 001` и начинаем связывать конкретный circuit mechanism с D1/D2/DAT/internal-state literature.
+
+## Experiment 001 — PAM04
+
+Первый focused experiment проверяет, имеет ли необычно концентрированный вход части PAM04 функциональное значение хотя бы в простой connectome-constrained модели.
+
+Порядок проверки:
+
+1. exact-type структурный кандидат и robustness thresholds;
+2. bilateral evidence;
+3. реальные upstream/downstream partners;
+4. counterfactual `knockout / medianize / amplify / shuffle`;
+5. parameter sweeps в State Lab;
+6. только после устойчивого model effect — независимая replication / литература / более биофизическая модель.
+
+State Lab не превращает модельный результат в биологический вывод. Его задача — быстро находить counterfactuals, которые стоит проверять дальше.
