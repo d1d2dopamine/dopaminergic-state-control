@@ -1,0 +1,45 @@
+name: Build and deploy research site
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -e .
+      - name: Build site from committed snapshot, else demo
+        shell: bash
+        run: |
+          if [ -f data/derived/male-cns-v1.0-dopamine/nodes.csv ]; then
+            dsc run --snapshot data/derived/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/pages --site-template site
+          else
+            echo "No committed real snapshot yet; publishing synthetic demo."
+            dsc run --snapshot data/demo --config configs/demo.yml --output build/pages --site-template site
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/pages/site
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

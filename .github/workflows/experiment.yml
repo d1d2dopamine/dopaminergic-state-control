@@ -1,0 +1,25 @@
+name: Run experiment
+on:
+  workflow_dispatch:
+    inputs:
+      snapshot_artifact_note:
+        description: Informational note for this run
+        required: false
+        default: manual experiment
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -e '.[dev]'
+      - run: pytest
+      - name: Current experiment harness
+        run: |
+          echo "Experiment runner placeholder: add a versioned script/config under experiments/."
+          echo "The discovery engine itself must not silently become a hypothesis test."

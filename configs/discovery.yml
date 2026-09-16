@@ -1,0 +1,13 @@
+dataset:
+  name: male-cns:v1.0
+  min_nt_confidence: 0.70
+  min_synapses: 3
+  traced_only: true
+
+discovery:
+  robust_z_threshold: 3.5
+  top_findings: 50
+  convergence_min_core_sources: 3
+  convergence_top_n: 10
+site:
+  title: Dopaminergic State Control

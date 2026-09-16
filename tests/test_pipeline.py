@@ -1,0 +1,13 @@
+from pathlib import Path
+
+from dsc.pipeline import run_pipeline
+
+
+def test_pipeline_builds_site(tmp_path: Path):
+    out = tmp_path / "run"
+    manifest = run_pipeline("data/demo", "configs/demo.yml", out, "site")
+    assert manifest["dataset"] == "synthetic-demo"
+    assert (out / "findings.json").exists()
+    assert (out / "site" / "index.html").exists()
+    assert (out / "site" / "data" / "network.json").exists()
+    assert (out / "site" / "data" / "run.json").exists()

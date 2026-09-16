@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.DS_Store
+
+# Large upstream data are never committed.
+data/raw/
+data/cache/
+
+# Generated local build products.
+build/
+results/current/
+
+# Keep generated public site data only when intentionally committed.
+site/data/*.json
+!site/data/.gitkeep

@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: "Dopaminergic State Control"
+message: "If you use this software or derived results, cite this repository and the original MaleCNS dataset/paper."
+type: software
+authors:
+  - name: d1d2dopamine
+version: 0.1.0
+date-released: 2026-09-16
+license: MIT
+repository-code: "https://github.com/d1d2dopamine/dopaminergic-state-control"

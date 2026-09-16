@@ -1,0 +1,65 @@
+name: Update MaleCNS dopamine snapshot
+on:
+  workflow_dispatch:
+    inputs:
+      min_nt_confidence:
+        description: Minimum aggregate dopamine prediction confidence
+        required: true
+        default: '0.70'
+      min_synapses:
+        description: Minimum edge weight retained in one-hop snapshot
+        required: true
+        default: '3'
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: malecns-research
+  cancel-in-progress: false
+jobs:
+  build-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -e .
+      - name: Cache official MaleCNS flat files
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/male-cns-v1.0
+          key: male-cns-v1.0-flat-v1
+      - name: Download official MaleCNS v1.0 and build bounded dopamine snapshot
+        run: |
+          dsc fetch-malecns \
+            --raw-dir "${{ runner.temp }}/male-cns-v1.0" \
+            --output build/male-cns-v1.0-dopamine \
+            --min-nt-confidence "${{ inputs.min_nt_confidence }}" \
+            --min-synapses "${{ inputs.min_synapses }}"
+      - name: Run discovery on real snapshot
+        run: dsc run --snapshot build/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/research --site-template site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: male-cns-v1.0-dopamine-research
+          path: |
+            build/male-cns-v1.0-dopamine/
+            build/research/
+          if-no-files-found: error
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/research/site
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build-snapshot
+    steps:
+      - name: Deploy real research site
+        id: deployment
+        uses: actions/deploy-pages@v4

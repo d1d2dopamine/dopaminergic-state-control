@@ -1,0 +1,12 @@
+dataset:
+  name: synthetic-demo
+  min_nt_confidence: 0.70
+  min_synapses: 2
+  traced_only: false
+discovery:
+  robust_z_threshold: 2.8
+  top_findings: 30
+  convergence_min_core_sources: 3
+  convergence_top_n: 10
+site:
+  title: Dopaminergic State Control — Demo
