@@ -1,17 +1,13 @@
 name: Build and deploy research site
-
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,17 +22,16 @@ jobs:
         shell: bash
         run: |
           if [ -f data/derived/male-cns-v1.0-dopamine/nodes.csv ]; then
-            echo "Publishing committed MaleCNS snapshot."
             dsc run --snapshot data/derived/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/pages --site-template site
+            dsc geometry-manifest --output build/pages/site/data/geometry.json --vendor-dir build/pages/site/data/geometry --findings build/pages/findings.json --max-vendored-skeletons 256
           else
-            echo "No committed real snapshot; publishing synthetic demo preview."
+            echo "No committed real snapshot; publishing synthetic demo preview without MaleCNS geometry manifest."
             dsc run --snapshot data/demo --config configs/demo.yml --output build/pages --site-template site
           fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
           path: build/pages/site
-
   deploy:
     environment:
       name: github-pages

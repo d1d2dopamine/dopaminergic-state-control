@@ -29,14 +29,16 @@ jobs:
         with:
           path: ${{ runner.temp }}/male-cns-v1.0
           key: male-cns-v1.0-flat-v1
-      - name: Download official MaleCNS v1.0 and build bounded dopamine snapshot
+      - name: Build bounded dopamine snapshot + full-degree controls
         run: |
           dsc fetch-malecns \
             --raw-dir "${{ runner.temp }}/male-cns-v1.0" \
             --output build/male-cns-v1.0-dopamine \
             --min-synapses "${{ inputs.min_synapses }}"
-      - name: Run discovery on real snapshot
+      - name: Run peer-aware discovery and null tests
         run: dsc run --snapshot build/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/research --site-template site
+      - name: Build official MaleCNS 3D geometry manifest
+        run: dsc geometry-manifest --output build/research/site/data/geometry.json --vendor-dir build/research/site/data/geometry --findings build/research/findings.json --max-vendored-skeletons 256
       - uses: actions/upload-artifact@v4
         with:
           name: male-cns-v1.0-dopamine-research

@@ -1,21 +1,19 @@
-# Website
+# Research site
 
-The site is plain HTML/CSS/JavaScript. There is no framework and no backend.
+The site is intentionally not a public-facing showcase. It is a compact instrument panel.
 
-Generated files are copied into `build/<run>/site/data/`:
+Design rules:
 
-- `findings.json`
-- `network.json`
-- `features.json`
-- `run.json`
+- grayscale only;
+- no gradients, decorative cards, hero sections or marketing text;
+- dense tables over decorative charts;
+- raw IDs, methods, scores and null statistics remain visible;
+- the 3D specimen view is the only major visualization because it carries anatomical information.
 
-GitHub Pages only serves the generated static directory.
+## 3D specimen
 
-Pages:
+The viewer is custom WebGL2 with no visualization framework dependency. The GitHub Action copies official MaleCNS region meshes and the selected official neuron skeletons into the deployed Pages artifact; the viewer then loads them from the project's own site. The manifest preserves their FlyEM/Janelia source URLs and hashes.
 
-- **Overview** — run summary and highest-score candidates.
-- **Findings** — searchable candidate list.
-- **Network** — local graph around the selected candidate.
-- **Runs** — exact provenance manifest.
+Mouse drag rotates. Wheel zooms. `regions` toggles the background anatomy. Selecting another finding discards the previous highlighted skeleton buffers and loads the new focus/related cells.
 
-The UI intentionally does not present anomaly score as biological importance.
+For performance, regional geometry is loaded concurrently and rendered only when the scene changes; the renderer does not redraw ~7M source triangles continuously at 60 FPS.

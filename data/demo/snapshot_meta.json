@@ -1,0 +1,7 @@
+{
+  "dataset": "synthetic-demo",
+  "eligible_traced_neurons": 42,
+  "dopamine_core_count": 12,
+  "edge_threshold_synapses": 2,
+  "degree_scope": "complete synthetic fixture"
+}

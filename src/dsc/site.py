@@ -10,17 +10,26 @@ from .io import write_json
 
 
 def _serialise_nodes(nodes: pd.DataFrame, core_ids: set[int]) -> list[dict]:
+    fields = ["body_id", "type", "side", "status", "nt", "nt_confidence", "superclass", "class", "subclass", "full_in_partner_count", "full_in_strength"]
+    available = [f for f in fields if f in nodes.columns]
     out = []
-    for row in nodes.itertuples(index=False):
-        out.append({
-            "id": int(row.body_id),
-            "type": str(row.type),
-            "side": str(row.side),
-            "status": str(row.status),
-            "nt": str(row.nt),
-            "nt_confidence": float(row.nt_confidence),
-            "core": int(row.body_id) in core_ids,
-        })
+    for _, row in nodes[available].iterrows():
+        record = {
+            "id": int(row["body_id"]),
+            "type": str(row.get("type", "unknown")),
+            "side": str(row.get("side", "unknown")),
+            "status": str(row.get("status", "unknown")),
+            "nt": str(row.get("nt", "unknown")),
+            "nt_confidence": float(row.get("nt_confidence", 0.0)),
+            "core": int(row["body_id"]) in core_ids,
+        }
+        for key in ["superclass", "class", "subclass"]:
+            if key in row:
+                record[key] = str(row[key])
+        for key in ["full_in_partner_count", "full_in_strength"]:
+            if key in row and pd.notna(row[key]):
+                record[key] = int(row[key])
+        out.append(record)
     return out
 
 

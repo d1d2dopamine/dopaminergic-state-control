@@ -1,38 +1,28 @@
 # Data and provenance
 
-## Primary dataset
+## Connectome
 
-The real-data workflow targets the public MaleCNS `v1.0` flat-connectome release.
+Pinned dataset: `male-cns:v1.0`.
 
-The repository does **not** redistribute the large upstream Feather files. `dsc fetch-malecns` downloads them from the official public Google Storage release path into an ignored local/runner directory, computes SHA-256 for the exact files used, and writes a bounded one-hop snapshot plus `source.lock.json`.
+The heavy GitHub Action downloads the official flat files for annotations, consensus neurotransmitters and neuron-to-neuron weights. Raw upstream files stay in the Actions cache and are not committed.
 
-Expected upstream files:
+The bounded snapshot contains every edge ≥ `min_synapses` touching a consensus-dopamine core neuron. During the same full-edge scan, v0.2 also records each snapshot target's full traced presynaptic partner count and strength at the same threshold. These fields support the convergence null.
 
-- `body-annotations-male-cns-v1.0-minconf-0.5.feather`
-- `body-neurotransmitters-male-cns-v1.0.feather`
-- `connectome-weights-male-cns-v1.0-minconf-0.5.feather`
+`snapshot_meta.json` records the traced universe size and degree scope. `source.lock.json` records upstream URLs, byte sizes and SHA-256 hashes.
 
-The full weights file is about 1.1 GB, so real snapshot creation is a manual workflow, not a job run on every push.
+## Dopamine identity
 
-## Derived snapshot schema
+`consensus_nt` defines transmitter identity. `predicted_nt` and prediction confidence are provenance only. This rule exists because the first real run demonstrated that raw predictions can misclassify many non-dopaminergic cells before consensus overrides are applied.
 
-`nodes.csv`
+## 3D geometry
 
-- `body_id`
-- `type`
-- `side`
-- `status`
-- `nt`
-- `nt_confidence`
+The generated site does not use a hand-built fly model.
 
-`edges.csv`
+`dsc geometry-manifest` queries official FlyEM/Janelia public storage. In the real GitHub Action it vendors the region meshes and a bounded, focus-first set of skeletons referenced by the current findings into the Pages artifact. Non-vendored contextual skeletons fall back to the same official public endpoint at view time. The project's own WebGL viewer loads:
 
-- `pre`
-- `post`
-- `weight`
+- MaleCNS neuropil ROI meshes from `fullbrain-roi-v5/mesh/`;
+- individual MaleCNS neuron centerline skeletons from the v1.0 precomputed skeleton directory.
 
-The snapshot is deliberately boring. Keeping a small, documented intermediate format lets the analysis and website stay independent of upstream schema changes.
+The two sources use native MaleCNS EM coordinates (nanometers), so selected skeletons sit inside the published reconstructed anatomy without per-neuron warping. `geometry.json` records original URLs, byte sizes and SHA-256 hashes for the copied geometry.
 
-## License
-
-MaleCNS is distributed by the project under CC-BY. The code in this repository is MIT. Dataset attribution must be preserved in any redistributed derived data/results.
+The viewer deliberately does **not** draw fake straight lines between neurons. A connectome edge means synaptic connectivity; it is not a continuous anatomical cable from one cell center to another.

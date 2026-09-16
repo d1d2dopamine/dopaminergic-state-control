@@ -34,6 +34,16 @@ def load_snapshot(snapshot_dir: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]
     return nodes, edges
 
 
+def load_snapshot_meta(snapshot_dir: str | Path) -> dict:
+    root = Path(snapshot_dir)
+    meta_path = root / "snapshot_meta.json"
+    if meta_path.exists():
+        return json.loads(meta_path.read_text(encoding="utf-8"))
+    # Synthetic / legacy snapshots can still run. The discovery engine marks
+    # null-model results as approximate when the full traced universe is absent.
+    return {"dataset": "unknown", "eligible_traced_neurons": None, "degree_scope": "snapshot_only"}
+
+
 def write_json(path: str | Path, payload: object) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)

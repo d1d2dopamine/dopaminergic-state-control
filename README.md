@@ -1,41 +1,35 @@
 # dopaminergic-state-control
 
-**Automated candidate discovery in the dopaminergic neighborhood of the Drosophila MaleCNS connectome.**
+Reproducible discovery engine for unusual structure in the dopaminergic neighborhood of the **Drosophila MaleCNS v1.0** connectome.
 
-The project is built around a practical workflow: code searches the network for unusual structure, GitHub Actions reproduces the run, and GitHub Pages shows the candidates. A candidate is a lead for an experiment, not a biological conclusion.
+The workflow is intentionally practical: commit code, let GitHub Actions fetch/process the pinned connectome, then inspect candidate findings and real 3D MaleCNS anatomy on the project's own GitHub Pages site.
 
-## v0.1
+## v0.2
 
-The first release:
+v0.2 replaces the first broad anomaly screen with comparisons that are harder to fool:
 
-- selects MaleCNS `consensus_nt == dopamine` neurons from a bounded snapshot;
-- computes structural graph features;
-- surfaces robust feature outliers;
-- surfaces high-convergence dopaminergic targets;
-- builds a static Findings / Network / Runs website;
-- records input/config hashes and run metadata;
-- keeps discovery separate from hypothesis-testing experiments.
+- dopamine identity is `consensus_nt == dopamine`;
+- neuron outliers are compared against the **same exact MaleCNS type**, not against the whole dopamine population;
+- exact left/right pairs and multi-neuron left/right type groups are screened separately;
+- convergence is tested with a global mixing null that holds the target's full traced in-degree fixed;
+- FDR correction is conservative against the full traced target universe, not just targets already hit by dopamine neurons;
+- the site is a minimal grayscale research dashboard;
+- the 3D view loads **official MaleCNS neuropil meshes and official neuron centerline skeletons** in native MaleCNS EM coordinates.
 
-It does **not** claim to model ADHD, methylphenidate, D1/D2 receptor dynamics, or causal brain state transitions. See [`docs/SCIENTIFIC_SCOPE.md`](docs/SCIENTIFIC_SCOPE.md).
+A candidate is a lead, not a biological conclusion. The current convergence null controls for generic target degree but **not yet for neuropil/anatomical availability**.
 
-## Try it immediately
+## Research site
 
-The repository contains a synthetic dataset with deliberate anomalies so the whole pipeline works before downloading MaleCNS.
+The generated site contains only four views:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\\Scripts\\activate
-pip install -e '.[dev]'
-pytest
-dsc run --snapshot data/demo --config configs/demo.yml --output build/demo --site-template site
-python -m http.server 8000 --directory build/demo/site
-```
+`overview` → run counts + highest candidates  
+`findings` → dense filterable candidate table  
+`3d specimen` → real MaleCNS regional meshes + real selected neuron skeletons  
+`run` → exact commit, hashes and scope
 
-Open `http://localhost:8000`.
+The 3D viewer does not invent neuron-to-neuron geometry. It highlights published neuron centerlines. Connectivity between neurons remains a graph-table fact unless synapse coordinates are explicitly added in a later experiment.
 
-## Real MaleCNS snapshot
-
-The public MaleCNS v1.0 flat release is used directly; no Colab and no external web UI is required for the workflow.
+## Real MaleCNS run
 
 ```bash
 dsc fetch-malecns \
@@ -48,45 +42,31 @@ dsc run \
   --config configs/discovery.yml \
   --output build/research \
   --site-template site
+dsc geometry-manifest --output build/research/site/data/geometry.json
 ```
 
-Snapshot construction downloads roughly 1.1 GB of connectivity plus annotation/transmitter tables. Those upstream files are never committed. The produced `source.lock.json` records the exact source hashes.
+Normally you do not run this locally. Use **Actions → Update MaleCNS dopamine snapshot**. GitHub Actions caches the upstream flat-connectome files and deploys the finished site to GitHub Pages.
 
+## 3D data provenance
 
-### Neurotransmitter identity
+The site loads geometry from official FlyEM/Janelia public storage:
 
-Real-data snapshots use MaleCNS `consensus_nt` as transmitter identity. Raw `predicted_nt` and its confidence are retained only as provenance and are not allowed to override/filter a consensus assignment. This matters because the raw predictor can label many non-dopaminergic cell types as dopamine before cell-type/experimental consensus overrides are applied.
+- neuropil region meshes: `gs://flyem-male-cns/rois/fullbrain-roi-v5/mesh/`
+- neuron centerline skeletons: `gs://flyem-male-cns/v1.0/segmentation/skeletons-malecns/skeletons-precomputed/`
 
-## GitHub workflow
+Both share MaleCNS EM coordinates. Geometry is not copied from another visualization website. During the heavy workflow, GitHub Actions copies the official region meshes and a bounded, focus-first set of finding skeletons into the Pages artifact. If a contextual skeleton is outside that bounded cache, the viewer streams that same skeleton directly from the official public MaleCNS endpoint. `geometry.json` retains authoritative source URLs and SHA-256 hashes for every copied asset.
 
-- `CI` — tests every push/PR and rebuilds the synthetic run.
-- `Update MaleCNS dopamine snapshot` — manual heavy job; downloads/caches MaleCNS, produces the bounded snapshot + research artifact, and deploys the real site immediately.
-- `Build and deploy research site` — manual preview/deploy only; publishes a committed real snapshot when present, otherwise the demo. It does not run on every push, so it cannot overwrite a real research deployment accidentally.
-- `Run experiment` — intentionally minimal harness for versioned experiments under `experiments/`.
+MaleCNS data are CC BY. Project code is MIT.
 
-For Pages, set **Settings → Pages → Source → GitHub Actions** once.
+## Development
 
-## Repository map
-
-```text
-src/dsc/                scientific/discovery engine
-configs/                frozen run settings
-data/demo/               synthetic CI fixture
-data/derived/            small real snapshots (optional to commit)
-experiments/             hypothesis-driven work only
-docs/                    scope, plan, data and site docs
-site/                    static site template
-.github/workflows/       CI, heavy data update, Pages, experiments
+```bash
+pip install -e '.[dev]'
+pytest
 ```
 
-## Research rule
-
-> The engine may say “structurally unusual”. It may not say “mechanism”, “ADHD”, “methylphenidate effect”, or “causal” without a separately defined experiment.
-
-## Data attribution
-
-MaleCNS v1.0 is an external dataset and is not included in this repository. The MaleCNS project states that the dataset is CC-BY. Cite the original MaleCNS release/publication when using derived results.
+The synthetic fixture exists only to test the software and CI. Never interpret demo findings biologically.
 
 ## Русский
 
-Практический план и границы проекта: [`docs/PLAN_RU.md`](docs/PLAN_RU.md).
+See [`docs/PLAN_RU.md`](docs/PLAN_RU.md), [`docs/DATA.md`](docs/DATA.md) and [`docs/FIRST_RUN_RU.md`](docs/FIRST_RUN_RU.md).

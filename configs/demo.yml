@@ -2,10 +2,19 @@ dataset:
   name: synthetic-demo
   min_synapses: 2
   traced_only: false
+
 discovery:
-  robust_z_threshold: 2.8
   top_findings: 30
+  peer_min_type_size: 4
+  peer_robust_z_threshold: 2.8
+  bilateral_ratio_threshold: 2.5
+  bilateral_min_absolute_strength: 5
+  side_min_each: 2
+  side_permutations: 200
+  side_fdr: 0.20
+  random_seed: 20260916
   convergence_min_core_sources: 3
-  convergence_top_n: 10
+  convergence_fdr: 0.20
+  convergence_min_enrichment: 1.2
 site:
   title: Dopaminergic State Control — Demo

@@ -4,9 +4,17 @@ dataset:
   traced_only: true
 
 discovery:
-  robust_z_threshold: 3.5
   top_findings: 50
+  peer_min_type_size: 6
+  peer_robust_z_threshold: 3.5
+  bilateral_ratio_threshold: 3.0
+  bilateral_min_absolute_strength: 20
+  side_min_each: 3
+  side_permutations: 1000
+  side_fdr: 0.05
+  random_seed: 20260916
   convergence_min_core_sources: 3
-  convergence_top_n: 10
+  convergence_fdr: 0.05
+  convergence_min_enrichment: 2.0
 site:
   title: Dopaminergic State Control
