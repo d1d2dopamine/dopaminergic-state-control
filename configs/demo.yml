@@ -1,6 +1,5 @@
 dataset:
   name: synthetic-demo
-  min_nt_confidence: 0.70
   min_synapses: 2
   traced_only: false
 discovery:

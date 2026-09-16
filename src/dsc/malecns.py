@@ -73,17 +73,32 @@ def _read_annotations(path: Path) -> pd.DataFrame:
 
 
 def _read_nt(path: Path) -> pd.DataFrame:
+    """Read MaleCNS transmitter annotations using the curated consensus field.
+
+    MaleCNS exposes several transmitter properties. ``predicted_nt`` is a
+    per-neuron model prediction, while ``consensus_nt`` incorporates the
+    cell-type aggregate and experimental overrides and is the appropriate
+    field for defining transmitter identity in this project. Prediction
+    confidence is retained only as provenance; it is not used to filter the
+    consensus dopamine set.
+    """
     df = feather.read_feather(path)
-    body = _find_column(list(df.columns), ["body", "bodyId", "body_id"])
-    nt = _find_column(list(df.columns), ["predicted_nt", "consensus_nt", "nt"])
-    conf = next((c for c in ["predicted_nt_confidence", "confidence", "nt_confidence"] if c in df.columns), None)
+    columns = list(df.columns)
+    body = _find_column(columns, ["body", "bodyId", "body_id"])
+    consensus = _find_column(columns, ["consensus_nt", "consensusNt"])
+
+    predicted = next((c for c in ["predicted_nt", "predictedNt"] if c in df.columns), None)
+    conf = next((c for c in ["predicted_nt_confidence", "predictedNtConfidence"] if c in df.columns), None)
+    celltype = next((c for c in ["celltype_predicted_nt", "celltypePredictedNt"] if c in df.columns), None)
+
     out = pd.DataFrame({
         "body_id": df[body].astype("int64"),
-        "nt": df[nt].fillna("unknown").astype(str),
-        "nt_confidence": pd.to_numeric(df[conf], errors="coerce").fillna(0.0) if conf else 1.0,
+        "nt": df[consensus].fillna("unknown").astype(str),
+        "nt_confidence": pd.to_numeric(df[conf], errors="coerce").fillna(0.0) if conf else 0.0,
+        "predicted_nt": df[predicted].fillna("unknown").astype(str) if predicted else "unknown",
+        "celltype_predicted_nt": df[celltype].fillna("unknown").astype(str) if celltype else "unknown",
     })
-    # If multiple records exist, keep the highest-confidence prediction per body.
-    return out.sort_values("nt_confidence", ascending=False).drop_duplicates("body_id")
+    return out.drop_duplicates("body_id")
 
 
 def _edge_batches(path: Path):
@@ -93,8 +108,8 @@ def _edge_batches(path: Path):
         yield reader.get_batch(i)
 
 
-def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_confidence: float = 0.70,
-                            min_synapses: int = 3, traced_only: bool = True, refresh: bool = False) -> dict:
+def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_synapses: int = 3,
+                            traced_only: bool = True, refresh: bool = False) -> dict:
     paths = ensure_sources(raw_dir, refresh=refresh)
     annotations = _read_annotations(paths["annotations"])
     nt = _read_nt(paths["neurotransmitters"])
@@ -102,13 +117,24 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_con
     merged["nt"] = merged["nt"].fillna("unknown")
     merged["nt_confidence"] = merged["nt_confidence"].fillna(0.0)
 
-    dopamine_mask = merged["nt"].astype(str).str.lower().isin(["dopamine", "da"])
-    dopamine_mask &= merged["nt_confidence"].astype(float) >= float(min_confidence)
+    # IMPORTANT: ``nt`` is MaleCNS consensus_nt. Do not gate it by
+    # predicted_nt_confidence: the consensus field already encodes the curated
+    # transmitter assignment and can intentionally override raw predictions.
+    dopamine_mask = merged["nt"].astype(str).str.lower().str.strip().isin(["dopamine", "da"])
     if traced_only:
         dopamine_mask &= merged["status"].astype(str).str.lower().eq("traced")
     core_ids = set(merged.loc[dopamine_mask, "body_id"].astype(int))
     if not core_ids:
-        raise RuntimeError("No dopamine neurons selected from current MaleCNS files. Inspect source schema/labels.")
+        raise RuntimeError("No consensus dopamine neurons selected from current MaleCNS files. Inspect source schema/labels.")
+    # MaleCNS v1.0 has hundreds, not thousands, of consensus dopamine neurons.
+    # This broad guard is intentionally a schema-sanity check, not a biological
+    # assertion for future datasets. It prevents silently using predicted_nt as
+    # transmitter identity again.
+    if len(core_ids) > 1000:
+        raise RuntimeError(
+            f"Selected {len(core_ids)} consensus dopamine neurons; this is implausible for pinned MaleCNS v1.0. "
+            "Check neurotransmitter schema before continuing."
+        )
 
     tables = []
     for batch in _edge_batches(paths["edges"]):
@@ -142,7 +168,7 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_con
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    nodes[["body_id", "type", "side", "status", "nt", "nt_confidence"]].sort_values("body_id").to_csv(out / "nodes.csv", index=False)
+    nodes[["body_id", "type", "side", "status", "nt", "nt_confidence", "predicted_nt", "celltype_predicted_nt"]].sort_values("body_id").to_csv(out / "nodes.csv", index=False)
     edges.sort_values(["pre", "post"]).to_csv(out / "edges.csv", index=False)
 
     lock = {
@@ -155,7 +181,8 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_con
             for key, p in paths.items()
         },
         "selection": {
-            "min_nt_confidence": min_confidence,
+            "nt_selector": "consensus_nt == dopamine",
+            "predicted_nt_confidence_used_for_selection": False,
             "min_synapses": min_synapses,
             "traced_only": traced_only,
             "dopamine_core_count": len(core_ids),

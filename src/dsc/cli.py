@@ -21,7 +21,6 @@ def main() -> None:
     fetch = sub.add_parser("fetch-malecns", help="Build a one-hop dopamine snapshot from official MaleCNS v1.0 flat files")
     fetch.add_argument("--raw-dir", default="data/raw/male-cns-v1.0")
     fetch.add_argument("--output", default="data/derived/male-cns-v1.0-dopamine")
-    fetch.add_argument("--min-nt-confidence", type=float, default=0.70)
     fetch.add_argument("--min-synapses", type=int, default=3)
     fetch.add_argument("--include-nontraced", action="store_true")
     fetch.add_argument("--refresh", action="store_true")
@@ -34,7 +33,6 @@ def main() -> None:
         lock = build_dopamine_snapshot(
             args.raw_dir,
             args.output,
-            min_confidence=args.min_nt_confidence,
             min_synapses=args.min_synapses,
             traced_only=not args.include_nontraced,
             refresh=args.refresh,

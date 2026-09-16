@@ -2,10 +2,6 @@ name: Update MaleCNS dopamine snapshot
 on:
   workflow_dispatch:
     inputs:
-      min_nt_confidence:
-        description: Minimum aggregate dopamine prediction confidence
-        required: true
-        default: '0.70'
       min_synapses:
         description: Minimum edge weight retained in one-hop snapshot
         required: true
@@ -38,7 +34,6 @@ jobs:
           dsc fetch-malecns \
             --raw-dir "${{ runner.temp }}/male-cns-v1.0" \
             --output build/male-cns-v1.0-dopamine \
-            --min-nt-confidence "${{ inputs.min_nt_confidence }}" \
             --min-synapses "${{ inputs.min_synapses }}"
       - name: Run discovery on real snapshot
         run: dsc run --snapshot build/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/research --site-template site

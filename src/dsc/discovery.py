@@ -32,10 +32,11 @@ class DiscoveryResult:
 
 
 def select_dopamine_core(nodes: pd.DataFrame, config: dict) -> set[int]:
-    min_conf = float(config["dataset"].get("min_nt_confidence", 0.7))
     traced_only = bool(config["dataset"].get("traced_only", True))
     nt = nodes["nt"].fillna("").astype(str).str.lower().str.strip()
-    mask = nt.isin({"dopamine", "da"}) & (nodes["nt_confidence"].astype(float) >= min_conf)
+    # ``nt`` in real snapshots is the MaleCNS consensus_nt field. Prediction
+    # confidence must not override or filter a curated consensus assignment.
+    mask = nt.isin({"dopamine", "da"})
     if traced_only:
         status = nodes["status"].fillna("").astype(str).str.lower()
         mask &= status.eq("traced")

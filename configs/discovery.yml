@@ -1,6 +1,5 @@
 dataset:
   name: male-cns:v1.0
-  min_nt_confidence: 0.70
   min_synapses: 3
   traced_only: true
 

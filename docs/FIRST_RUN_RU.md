@@ -36,14 +36,13 @@ Demo нужен только для проверки самого инструм
 
 Для первого запуска оставь:
 
-- `min_nt_confidence = 0.70`
 - `min_synapses = 3`
 
 Workflow автоматически:
 
 1. скачает официальные MaleCNS v1.0 flat-connectome файлы;
 2. посчитает SHA-256;
-3. выберет dopamine-predicted traced neurons;
+3. выберет `consensus_nt == dopamine` среди traced neurons;
 4. построит 1-hop snapshot;
 5. запустит discovery engine;
 6. соберёт Findings / Network / Runs;
@@ -72,3 +71,7 @@ Workflow автоматически:
 - no edges survived filter.
 
 Это не надо обходить молча. Если официальный dataset поменял schema или файл, адаптер надо обновить явно, сохранив старый manifest.
+
+## Почему больше нет min_nt_confidence
+
+MaleCNS хранит одновременно raw prediction и curated `consensus_nt`. Для идентичности нейромедиатора проект использует именно `consensus_nt`; confidence относится к raw prediction и не должен отбрасывать или переопределять consensus.

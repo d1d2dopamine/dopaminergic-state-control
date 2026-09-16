@@ -8,7 +8,7 @@ The project is built around a practical workflow: code searches the network for 
 
 The first release:
 
-- selects dopamine-predicted neurons from a bounded snapshot;
+- selects MaleCNS `consensus_nt == dopamine` neurons from a bounded snapshot;
 - computes structural graph features;
 - surfaces robust feature outliers;
 - surfaces high-convergence dopaminergic targets;
@@ -41,7 +41,6 @@ The public MaleCNS v1.0 flat release is used directly; no Colab and no external 
 dsc fetch-malecns \
   --raw-dir data/raw/male-cns-v1.0 \
   --output data/derived/male-cns-v1.0-dopamine \
-  --min-nt-confidence 0.70 \
   --min-synapses 3
 
 dsc run \
@@ -52,6 +51,11 @@ dsc run \
 ```
 
 Snapshot construction downloads roughly 1.1 GB of connectivity plus annotation/transmitter tables. Those upstream files are never committed. The produced `source.lock.json` records the exact source hashes.
+
+
+### Neurotransmitter identity
+
+Real-data snapshots use MaleCNS `consensus_nt` as transmitter identity. Raw `predicted_nt` and its confidence are retained only as provenance and are not allowed to override/filter a consensus assignment. This matters because the raw predictor can label many non-dopaminergic cell types as dopamine before cell-type/experimental consensus overrides are applied.
 
 ## GitHub workflow
 
