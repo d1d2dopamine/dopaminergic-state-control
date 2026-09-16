@@ -4,9 +4,9 @@ Reproducible discovery engine for unusual structure in the dopaminergic neighbor
 
 The workflow is intentionally practical: commit code, let GitHub Actions fetch/process the pinned connectome, then inspect candidate findings and real 3D MaleCNS anatomy on the project's own GitHub Pages site.
 
-## v0.2
+## v0.2.1
 
-v0.2 replaces the first broad anomaly screen with comparisons that are harder to fool:
+v0.2.1 keeps the peer-aware/statistical work from v0.2 and fixes the 3D runtime. v0.2 replaces the first broad anomaly screen with comparisons that are harder to fool:
 
 - dopamine identity is `consensus_nt == dopamine`;
 - neuron outliers are compared against the **same exact MaleCNS type**, not against the whole dopamine population;
@@ -14,7 +14,7 @@ v0.2 replaces the first broad anomaly screen with comparisons that are harder to
 - convergence is tested with a global mixing null that holds the target's full traced in-degree fixed;
 - FDR correction is conservative against the full traced target universe, not just targets already hit by dopamine neurons;
 - the site is a minimal grayscale research dashboard;
-- the 3D view loads **official MaleCNS neuropil meshes and official neuron centerline skeletons** in native MaleCNS EM coordinates.
+- the 3D view uses **official MaleCNS neuron centerline skeletons** over a lightweight LOD deterministically derived in CI from official MaleCNS neuropil meshes.
 
 A candidate is a lead, not a biological conclusion. The current convergence null controls for generic target degree but **not yet for neuropil/anatomical availability**.
 
@@ -54,7 +54,7 @@ The site loads geometry from official FlyEM/Janelia public storage:
 - neuropil region meshes: `gs://flyem-male-cns/rois/fullbrain-roi-v5/mesh/`
 - neuron centerline skeletons: `gs://flyem-male-cns/v1.0/segmentation/skeletons-malecns/skeletons-precomputed/`
 
-Both share MaleCNS EM coordinates. Geometry is not copied from another visualization website. During the heavy workflow, GitHub Actions copies the official region meshes and a bounded, focus-first set of finding skeletons into the Pages artifact. If a contextual skeleton is outside that bounded cache, the viewer streams that same skeleton directly from the official public MaleCNS endpoint. `geometry.json` retains authoritative source URLs and SHA-256 hashes for every copied asset.
+Both share MaleCNS EM coordinates. Geometry is not copied from another visualization website. During the heavy workflow, GitHub Actions caches the official full-resolution region meshes, records their source hashes, and derives a low-detail browser surface from original MaleCNS surface vertices. Full multi-million-triangle ROI meshes are not shipped to the browser. A bounded, focus-first set of finding skeletons is copied unchanged; other contextual skeletons can stream from the same official public endpoint. `geometry.json` retains authoritative source URLs/hashes plus LOD hashes and triangle counts.
 
 MaleCNS data are CC BY. Project code is MIT.
 

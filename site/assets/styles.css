@@ -66,3 +66,5 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 0; padding: 12px; b
   .viewer-sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
   .viewer-wrap { height: 70vh; }
 }
+#brain-canvas { touch-action: none; contain: strict; }
+.viewer-wrap { overflow: hidden; }

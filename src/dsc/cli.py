@@ -29,7 +29,9 @@ def main() -> None:
     geometry.add_argument("--output", required=True)
     geometry.add_argument("--vendor-dir")
     geometry.add_argument("--findings")
-    geometry.add_argument("--max-vendored-skeletons", type=int, default=256)
+    geometry.add_argument("--max-vendored-skeletons", type=int, default=128)
+    geometry.add_argument("--region-lod-divisions", type=int, default=20)
+    geometry.add_argument("--source-cache-dir")
 
     args = parser.parse_args()
     if args.command == "run":
@@ -48,11 +50,15 @@ def main() -> None:
         payload = build_geometry_manifest(
             args.output, vendor_dir=args.vendor_dir, findings_path=args.findings,
             max_vendored_skeletons=args.max_vendored_skeletons,
+            region_lod_divisions=args.region_lod_divisions, source_cache_dir=args.source_cache_dir,
         )
         print(json.dumps({
             "regions": len(payload["regions"]),
             "vendored_skeletons": len(payload.get("vendored_skeleton_ids", [])),
             "dataset": payload["dataset"],
+            "region_source_triangles": payload.get("region_lod", {}).get("source_triangles_total", 0),
+            "region_display_triangles": payload.get("region_lod", {}).get("display_triangles_total", 0),
+            "region_display_bytes": payload.get("region_lod", {}).get("display_bytes_total", 0),
         }, indent=2))
 
 

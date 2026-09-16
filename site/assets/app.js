@@ -11,10 +11,10 @@ function findingRows(findings){
   return `<table><thead><tr><th>rank</th><th>method score</th><th>method</th><th>candidate</th><th>focus</th><th></th></tr></thead><tbody>${findings.map(f=>`<tr data-kind="${esc(f.kind)}" data-search="${esc((f.title+' '+f.summary+' '+f.focus_node).toLowerCase())}"><td>${esc(f.method_rank??'—')}</td><td class="score">${fmt(Number(f.score||0))}</td><td>${esc(f.kind.replaceAll('_',' '))}</td><td>${esc(f.summary)}</td><td>${esc(f.focus_node)}</td><td><a href="network.html?finding=${encodeURIComponent(f.id)}">3d</a></td></tr>`).join('')}</tbody></table>`;
 }
 async function overview(){
-  const [findings, network, run] = await Promise.all([getJSON('data/findings.json'), getJSON('data/network.json'), getJSON('data/run.json')]);
-  const core = network.nodes.filter(n=>n.core).length;
+  const [findings, run] = await Promise.all([getJSON('data/findings.json'), getJSON('data/run.json')]);
+  const counts=run.counts||{};
   const s = [
-    ['dataset',run.dataset],['dopamine core',core],['snapshot nodes',network.nodes.length],['snapshot edges',network.edges.length],['candidates',findings.length]
+    ['dataset',run.dataset],['dopamine core',counts.dopamine_core_nodes??'—'],['snapshot nodes',counts.snapshot_nodes??'—'],['snapshot edges',counts.snapshot_edges??'—'],['candidates',findings.length]
   ];
   document.querySelector('#summary').innerHTML=s.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(fmt(v))}</dd></div>`).join('');
   document.querySelector('#top-table').innerHTML=findingRows(findings.slice(0,12));

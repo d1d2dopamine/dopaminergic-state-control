@@ -12,5 +12,5 @@ def test_pipeline_builds_site(tmp_path: Path):
     assert (out / "site" / "index.html").exists()
     assert (out / "site" / "network.html").exists()
     assert (out / "site" / "assets" / "brain.js").exists()
-    assert (out / "site" / "data" / "network.json").exists()
+    assert not (out / "site" / "data" / "network.json").exists()
     assert (out / "site" / "data" / "run.json").exists()

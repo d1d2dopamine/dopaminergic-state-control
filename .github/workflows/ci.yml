@@ -28,7 +28,8 @@ jobs:
         run: |
           test -s build/demo/findings.json
           test -s build/demo/run_manifest.json
-          test -s build/demo/site/data/network.json
+          test ! -e build/demo/site/data/network.json
+          test -s build/demo/site/data/run.json
           test -s build/demo/site/assets/brain.js
       - uses: actions/upload-artifact@v4
         with:

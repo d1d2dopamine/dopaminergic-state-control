@@ -47,6 +47,5 @@ def build_site(template_dir: str | Path, output_dir: str | Path, nodes: pd.DataF
     data_dir = dst / "data"
     data_dir.mkdir(exist_ok=True)
     write_json(data_dir / "findings.json", findings)
-    write_json(data_dir / "network.json", {"nodes": _serialise_nodes(nodes, core_ids), "edges": _serialise_edges(edges)})
     write_json(data_dir / "features.json", json.loads(features.to_json(orient="records")))
     write_json(data_dir / "run.json", manifest)
