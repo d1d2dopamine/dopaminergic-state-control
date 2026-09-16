@@ -57,7 +57,7 @@ Snapshot construction downloads roughly 1.1 GB of connectivity plus annotation/t
 
 - `CI` — tests every push/PR and rebuilds the synthetic run.
 - `Update MaleCNS dopamine snapshot` — manual heavy job; downloads/caches MaleCNS, produces the bounded snapshot + research artifact, and deploys the real site immediately.
-- `Build and deploy research site` — publishes a committed real snapshot when present; otherwise publishes the demo.
+- `Build and deploy research site` — manual preview/deploy only; publishes a committed real snapshot when present, otherwise the demo. It does not run on every push, so it cannot overwrite a real research deployment accidentally.
 - `Run experiment` — intentionally minimal harness for versioned experiments under `experiments/`.
 
 For Pages, set **Settings → Pages → Source → GitHub Actions** once.

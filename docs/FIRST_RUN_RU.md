@@ -24,9 +24,9 @@ Demo нужен только для проверки самого инструм
 
 **Settings → Pages → Build and deployment → Source → GitHub Actions**
 
-После этого workflow `Build and deploy research site` сможет публиковать сайт.
+После этого workflow `Build and deploy research site` сможет публиковать сайт вручную. Он специально не запускается на каждый push, чтобы synthetic demo не мог затереть уже опубликованный реальный результат.
 
-Пока реального snapshot нет, обычный Pages workflow показывает synthetic demo.
+До первого real-data run этот workflow можно использовать только как ручной preview synthetic demo.
 
 ## 4. Первый реальный запуск
 
