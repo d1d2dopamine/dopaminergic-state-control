@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dopaminergic-state-control"
-version = "0.3.0"
+version = "0.4.0"
 description = "Reproducible discovery engine for unusual structure in the MaleCNS dopaminergic network."
 readme = "README.md"
 requires-python = ">=3.12"

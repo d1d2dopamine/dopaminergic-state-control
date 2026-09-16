@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       min_synapses:
-        description: Minimum edge weight retained in one-hop snapshot
+        description: Primary analysis edge threshold (snapshot still retains weight >= 1 for robustness)
         required: true
         default: '3'
 permissions:
@@ -29,14 +29,21 @@ jobs:
         with:
           path: ${{ runner.temp }}/male-cns-v1.0
           key: male-cns-v1.0-flat-v1
+      - name: Cache compact MaleCNS ROI availability metadata
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/male-cns-v1.0-roi-meta
+          key: male-cns-v1.0-roi-meta-v1
       - name: Build bounded dopamine snapshot + full-degree controls
         run: |
           dsc fetch-malecns \
             --raw-dir "${{ runner.temp }}/male-cns-v1.0" \
             --output build/male-cns-v1.0-dopamine \
-            --min-synapses "${{ inputs.min_synapses }}"
+            --min-synapses "${{ inputs.min_synapses }}" \
+            --snapshot-floor 1 \
+            --roi-cache "${{ runner.temp }}/male-cns-v1.0-roi-meta/roi-availability.json.gz"
       - name: Run peer-aware discovery and null tests
-        run: dsc run --snapshot build/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/research --site-template site
+        run: dsc run --snapshot build/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/research --site-template site --min-synapses "${{ inputs.min_synapses }}"
       - name: Cache official MaleCNS ROI source meshes
         uses: actions/cache@v4
         with:
@@ -58,8 +65,49 @@ jobs:
           dsc synapse-sites \
             --findings build/research/findings.json \
             --output build/research/site/data/synapses.json \
-            --max-sources 8 \
-            --max-points 2500
+            --max-sources 24 \
+            --max-points 4000 \
+            --spatial-permutations 400
+      - name: Write research summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os
+          from collections import Counter
+          findings = json.load(open('build/research/findings.json', encoding='utf-8'))
+          manifest = json.load(open('build/research/run_manifest.json', encoding='utf-8'))
+          try:
+              synapses = json.load(open('build/research/site/data/synapses.json', encoding='utf-8'))
+          except FileNotFoundError:
+              synapses = {'total_points': 0, 'findings': {}}
+          statuses = Counter(f.get('status', 'candidate') for f in findings)
+          kinds = Counter(f.get('kind', 'unknown') for f in findings)
+          queue = [f for f in findings if f.get('status') in {'survived_controls', 'survived_thresholds'}]
+          anatomical = manifest.get('snapshot_meta', {}).get('anatomical_null', {})
+          roi_meta = anatomical.get('roi_metadata', {})
+          roi_after = roi_meta.get('after', {})
+          lines = [
+              '# Dopaminergic State Control v0.4',
+              '',
+              f"- dopamine core: {manifest['counts'].get('dopamine_core_nodes', '—')}",
+              f"- findings shown: {len(findings)}",
+              f"- review queue: {len(queue)}",
+              f"- real synapse points: {synapses.get('total_points', 0)}",
+              f"- ROI metadata: {roi_meta.get('source', 'unknown')}",
+              f"- ROI output coverage: {float(roi_after.get('output_fraction', 0))*100:.1f}%",
+              f"- targets with anatomical pool: {anatomical.get('snapshot_targets_with_anatomical_pool', 0)} / {anatomical.get('snapshot_nodes', 0)}",
+              '',
+              '## Control states',
+          ]
+          lines += [f"- {k}: {v}" for k, v in sorted(statuses.items())]
+          lines += ['', '## Detector counts']
+          lines += [f"- {k}: {v}" for k, v in sorted(kinds.items())]
+          lines += ['', '## Highest review candidates']
+          for f in queue[:12]:
+              lines.append(f"- `{f['focus_node']}` — {f['kind']} — {f['status']} — {f['summary']}")
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+              out.write('\n'.join(lines) + '\n')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: male-cns-v1.0-dopamine-research

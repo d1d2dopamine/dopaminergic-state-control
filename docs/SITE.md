@@ -1,24 +1,15 @@
 # Research site
 
-The site is intentionally not a public-facing showcase. It is a compact grayscale research instrument.
+The site is a compact grayscale research instrument, not a public-facing showcase.
 
-## 3D specimen v0.3
+## Findings v0.4
 
-The viewer is custom WebGL2. It uses one lightweight anatomical context shell whenever the official MaleCNS `fullbrain-major-shells` source is available, with the v0.2 optimized ROI path as a fallback.
+The table now exposes control status, threshold survival, null type and optional spatial synapse evidence. `review_queue.json` contains only `survived_controls` and `survived_thresholds` findings.
 
-The browser never receives full-resolution source anatomy. GitHub Actions downloads/caches official geometry, records source provenance, builds a deterministic LOD and deploys only the LOD plus the finding-relevant skeletons.
+## 3D specimen
 
-Viewer behavior:
+The v0.3 WebGL2 viewer remains intentionally lightweight: official MaleCNS context shell, focus-first real skeletons, lazy context, natural orbit/pan/zoom, camera presets, clipping and URL-preserved views.
 
-- drag = grab-style orbit;
-- `Shift + drag`, right-drag or middle-drag = pan;
-- wheel = zoom;
-- double-click = fit selected focus neuron;
-- anterior/posterior/dorsal/ventral/left/right camera presets;
-- adjustable brain/context opacity;
-- front clipping control for seeing internal neurites;
-- focus neuron rendered above the faint shell;
-- context neurons disabled by default and loaded lazily;
-- camera state can be copied into the URL.
+v0.4 adds analysis metadata around the existing synapse overlay. For direct dopamine-input findings the sidebar can display the number of queried sites, source-segregation eta², permutation BH q and the resulting descriptive spatial pattern.
 
-For `dopamine_input_enrichment` findings, the heavy workflow also attempts an anonymous MaleCNS neuPrint query for individual `SynapsesTo` sites. The browser converts the returned 8-nm voxel coordinates to the same native-nm coordinate space as the skeletons before applying the shared viewer transform. These points are optional visualization evidence: a failed query is recorded but does not fail the research run.
+The viewer never draws an invented continuous cable between two neurons.

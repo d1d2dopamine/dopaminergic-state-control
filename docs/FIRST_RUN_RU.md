@@ -1,30 +1,17 @@
-# Первый запуск v0.3.0
+# Первый запуск v0.4.0
 
 После commit/push обычный `CI` должен стать зелёным.
 
-Затем запускай:
+Затем:
 
-**Actions → Update MaleCNS dopamine snapshot → Run workflow**
+1. **Actions → Update MaleCNS dopamine snapshot**.
+2. `min_synapses` оставь `3`, если мы специально не проверяем другой primary cutoff.
+3. Запусти workflow.
+4. В summary самого GitHub Action появятся counts по control statuses и первые элементы review queue.
+5. На Pages открой `findings` и сначала фильтруй по `survived controls` / `survived thresholds`.
 
-Для `min_synapses` оставь `3`.
+Внутренне workflow теперь хранит one-hop edges начиная с weight 1. Это не означает, что основной анализ стал использовать threshold 1: primary cutoff по-прежнему 3. Низкий floor нужен, чтобы тот же run мог проверить 1/3/5/10 без повторного скачивания connectome.
 
-Workflow:
+Если ROI metadata доступны, dopamine-input findings используют ROI-overlap availability null. Если нет — соответствующая карточка будет `global_only`, а не замаскирована под anatomy-controlled result.
 
-1. восстанавливает/скачивает официальный MaleCNS v1.0;
-2. выбирает `consensus_nt == dopamine`;
-3. во время полного прохода по edge table считает full traced input degree для null model;
-4. строит bounded dopamine snapshot;
-5. запускает within-type, left/right и convergence screens;
-6. скачивает/кэширует официальные ROI meshes и строит из них облегчённый browser LOD;
-7. вендорит приоритетные реальные neuron skeletons;
-8. публикует GitHub Pages сайт.
-
-Ожидаемый sanity check: dopamine core должен быть порядка сотен клеток, не тысяч. В проверенном MaleCNS run было 392 traced consensus-dopamine neurons. Если число внезапно становится >1000, importer специально падает.
-
-## Что изменено в 3D после v0.2.0
-
-В v0.2.0 браузер получал все 80 исходных ROI meshes (~7.27 млн треугольников) и сам преобразовывал их на main thread. Это было слишком тяжело и могло подвесить не только вкладку, но и GPU compositor браузера.
-
-v0.3.0 оставляет исходные meshes в CI/cache как источник истины, предпочитает официальный fullbrain-major-shells и кладёт на сайт только детерминированный low-detail derivative. В `geometry.json` остаются source URL, source SHA-256, исходное число triangles и hash самого LOD.
-
-Focus neuron загружается первым. Контекстные нейроны по умолчанию выключены и грузятся только по кнопке `context`.
+3D остался инструментом проверки: серый прозрачный brain shell, реальные skeletons и, где применимо, реальные synapse sites.

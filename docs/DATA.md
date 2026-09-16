@@ -4,25 +4,32 @@
 
 Pinned dataset: `male-cns:v1.0`.
 
-The heavy GitHub Action downloads the official flat files for annotations, consensus neurotransmitters and neuron-to-neuron weights. Raw upstream files stay in the Actions cache and are not committed.
+The heavy GitHub Action downloads the official flat files for annotations, consensus neurotransmitters and neuron-to-neuron weights. Raw upstream files remain in the Actions cache and are not committed.
 
-The bounded snapshot contains every edge ≥ `min_synapses` touching a consensus-dopamine core neuron. During the same full-edge scan, v0.2 also records each snapshot target's full traced presynaptic partner count and strength at the same threshold. These fields support the convergence null.
+v0.4 keeps every weight >= 1 edge touching a consensus-dopamine neuron in the bounded snapshot. The primary analysis threshold remains configurable (default 3). During the same full-connectome scan the builder records target in-degree/in-strength at thresholds 1, 3, 5 and 10, allowing threshold robustness without another download.
 
-`snapshot_meta.json` records the traced universe size and degree scope. `source.lock.json` records upstream URLs, byte sizes and SHA-256 hashes.
+`snapshot_meta.json` records the edge floor, primary threshold, robustness thresholds, traced universe and anatomical-null coverage. `source.lock.json` records upstream URLs, byte sizes and SHA-256 hashes.
 
 ## Dopamine identity
 
-`consensus_nt` defines transmitter identity. `predicted_nt` and prediction confidence are provenance only. This rule exists because the first real run demonstrated that raw predictions can misclassify many non-dopaminergic cells before consensus overrides are applied.
+`consensus_nt` defines transmitter identity. Raw transmitter prediction/confidence are provenance only.
+
+## ROI availability
+
+When the MaleCNS annotation export exposes `inputRois`/`outputRois`, those lists are normalised into the bounded snapshot. If only `roiInfo` is present, input/output ROI lists are derived from positive post/pre counts respectively.
+
+If the flat annotation file does not provide broad ROI coverage, the builder makes a fail-soft query to the pinned `male-cns:v1.0` neuPrint dataset for only `bodyId`, `inputRois` and `outputRois`. GitHub Actions caches that compact response as compressed JSON, so we do not download the 6.8 GB synaptic-partner table or 12.7 GB synapse-point table just to construct the availability null. If the query is unavailable, the run remains reproducible but affected convergence candidates are explicitly downgraded to `global_only`. `snapshot_meta.json` records the metadata source and coverage.
+
+For each snapshot target, CI computes the number of eligible traced neurons whose `outputRois` intersect the target's `inputRois`, plus the number of consensus-dopamine neurons inside that pool. These are the parameters for the v0.4 anatomical-availability null.
+
+ROI overlap is intentionally described as availability, not contact probability.
 
 ## 3D geometry
 
-The generated site does not use a hand-built fly model.
+The viewer uses official MaleCNS geometry. It prefers the lightweight CI-derived LOD of the official `fullbrain-major-shells`; if that source cannot be built, the optimized ROI fallback remains available. Individual neurons use official v1.0 centerline skeletons in the same MaleCNS EM coordinate space.
 
-`dsc geometry-manifest` queries official FlyEM/Janelia public storage. In the real GitHub Action it vendors the region meshes and a bounded, focus-first set of skeletons referenced by the current findings into the Pages artifact. Non-vendored contextual skeletons fall back to the same official public endpoint at view time. The project's own WebGL viewer loads:
+## Synapse positions
 
-- MaleCNS neuropil ROI meshes from `fullbrain-roi-v5/mesh/`;
-- individual MaleCNS neuron centerline skeletons from the v1.0 precomputed skeleton directory.
+For direct dopamine-input findings, `dsc synapse-sites` makes a best-effort query against the public MaleCNS neuPrint dataset. Returned coordinates are preserved in native dataset units and the manifest records the 8-nm-to-nm conversion used by the viewer/analysis.
 
-The two sources use native MaleCNS EM coordinates (nanometers), so selected skeletons sit inside the published reconstructed anatomy without per-neuron warping. `geometry.json` records original URLs, byte sizes and SHA-256 hashes for the copied geometry.
-
-The viewer deliberately does **not** draw fake straight lines between neurons. A connectome edge means synaptic connectivity; it is not a continuous anatomical cable from one cell center to another.
+v0.4 also computes source-label spatial segregation on postsynaptic sites. This analysis only concerns the queried dopamine sources and is kept separate from the connectome discovery null.

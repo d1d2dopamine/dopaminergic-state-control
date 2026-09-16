@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -7,7 +8,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import numpy as np
+
 from .io import write_json
+from .stats import benjamini_hochberg
 
 SERVER = "https://neuprint.janelia.org"
 DATASET = "male-cns:v1.0"
@@ -16,7 +20,7 @@ DATASET = "male-cns:v1.0"
 def _post_cypher(cypher: str, token: str | None = None, timeout: int = 120, retries: int = 3) -> dict:
     payload = json.dumps({"cypher": cypher, "dataset": DATASET}).encode("utf-8")
     headers = {
-        "User-Agent": "dopaminergic-state-control/0.3.0",
+        "User-Agent": "dopaminergic-state-control/0.4.0",
         "Content-Type": "application/json",
     }
     if token:
@@ -44,7 +48,7 @@ def _pair_synapses(target: int, sources: list[int], max_points: int, token: str 
         return []
     ids = ",".join(str(int(x)) for x in sources)
     # Synapse locations in neuPrint are stored in the dataset's 8-nm voxel coordinates.
-    # We return both pre/post coordinates and apply the x8 transform only in the viewer.
+    # We return both pre/post coordinates and apply the x8 transform in analysis/viewer.
     cypher = f"""
 MATCH (n:Neuron)-[e:ConnectsTo]->(m:Neuron),
       (n)-[:Contains]->(nss:SynapseSet)-[:ConnectsTo]->(mss:SynapseSet)<-[:Contains]-(m),
@@ -79,17 +83,87 @@ LIMIT {int(max_points)}
     return rows
 
 
+def _source_eta_squared(points_nm: np.ndarray, labels: np.ndarray) -> float:
+    if len(points_nm) < 2:
+        return 0.0
+    center = points_nm.mean(axis=0)
+    total_ss = float(np.square(points_nm - center).sum())
+    if total_ss <= 0:
+        return 0.0
+    within_ss = 0.0
+    for source in np.unique(labels):
+        subset = points_nm[labels == source]
+        if len(subset) == 0:
+            continue
+        c = subset.mean(axis=0)
+        within_ss += float(np.square(subset - c).sum())
+    return float(max(0.0, min(1.0, 1.0 - within_ss / total_ss)))
+
+
+def _spatial_metrics(points: list[dict], scale_to_nm: float = 8.0, permutations: int = 400, seed: int = 0) -> dict:
+    """Describe whether different dopamine sources occupy distinct target territories.
+
+    This is deliberately *not* a test that dopamine synapses are clustered versus
+    every other transmitter. It only asks whether source identity explains the
+    spatial distribution of the dopamine sites we queried.
+    """
+    valid = [p for p in points if p.get("post_xyz") is not None and p.get("pre") is not None]
+    if len(valid) < 4:
+        return {"available": False, "reason": "fewer than four postsynaptic sites"}
+    xyz = np.asarray([p["post_xyz"] for p in valid], dtype=float) * float(scale_to_nm)
+    labels = np.asarray([int(p["pre"]) for p in valid], dtype=np.int64)
+    sources, counts = np.unique(labels, return_counts=True)
+    if len(sources) < 2:
+        return {"available": False, "reason": "fewer than two dopamine sources", "points": int(len(valid))}
+
+    center = xyz.mean(axis=0)
+    rms = float(np.sqrt(np.mean(np.sum(np.square(xyz - center), axis=1))))
+    lo, hi = xyz.min(axis=0), xyz.max(axis=0)
+    extent = float(np.linalg.norm(hi - lo))
+    observed_eta2 = _source_eta_squared(xyz, labels)
+
+    # Permute source identities while preserving the exact number of sites from
+    # every queried source. Significant high eta2 means source-specific spatial
+    # segregation/territories, not a causal mechanism.
+    rng = np.random.default_rng(int(seed))
+    exceed = 0
+    if permutations > 0:
+        for _ in range(int(permutations)):
+            permuted = rng.permutation(labels)
+            if _source_eta_squared(xyz, permuted) >= observed_eta2 - 1e-12:
+                exceed += 1
+        p_value = (exceed + 1.0) / (int(permutations) + 1.0)
+    else:
+        p_value = 1.0
+
+    return {
+        "available": True,
+        "points": int(len(valid)),
+        "sources": int(len(sources)),
+        "rms_radius_nm": rms,
+        "bounding_box_diagonal_nm": extent,
+        "source_segregation_eta2": float(observed_eta2),
+        "source_label_permutation_p": float(p_value),
+        "source_counts": {str(int(s)): int(c) for s, c in zip(sources, counts)},
+        "interpretation": "Fraction of postsynaptic spatial variance associated with dopamine-source identity; high significant values indicate source-specific territories among queried dopamine inputs.",
+    }
+
+
 def build_synapse_site_manifest(
     findings_path: str | Path,
     output: str | Path,
-    max_sources: int = 8,
-    max_points_per_finding: int = 2500,
+    max_sources: int = 24,
+    max_points_per_finding: int = 4000,
     token: str | None = None,
+    spatial_permutations: int = 400,
 ) -> dict:
     findings = json.loads(Path(findings_path).read_text(encoding="utf-8"))
     token = token or os.environ.get("NEUPRINT_APPLICATION_CREDENTIALS")
     out: dict[str, dict] = {}
     total_points = 0
+    spatial_ids: list[str] = []
+    spatial_pvalues: list[float] = []
+
     for finding in findings:
         fid = str(finding.get("id", ""))
         if not fid:
@@ -102,19 +176,35 @@ def build_synapse_site_manifest(
             }
             continue
         target = int(finding["focus_node"])
-        sources = [int(x) for x in finding.get("related_nodes", [])[: max(0, int(max_sources))]]
+        source_order = finding.get("source_ids_by_weight") or finding.get("related_nodes", [])
+        sources = [int(x) for x in source_order[: max(0, int(max_sources))]]
         try:
             points = _pair_synapses(target, sources, int(max_points_per_finding), token=token)
-            out[fid] = {
+            seed_bytes = hashlib.sha256(fid.encode("utf-8")).digest()[:8]
+            spatial = _spatial_metrics(
+                points,
+                scale_to_nm=8.0,
+                permutations=int(spatial_permutations),
+                seed=int.from_bytes(seed_bytes, "little"),
+            )
+            record = {
                 "status": "ok",
                 "target": target,
                 "sources": sources,
+                "queried_source_count": int(len(sources)),
+                "all_source_count": int(finding.get("all_source_count", len(source_order))),
                 "points": points,
                 "truncated": len(points) >= int(max_points_per_finding),
+                "spatial": spatial,
             }
+            if spatial.get("available"):
+                spatial_ids.append(fid)
+                spatial_pvalues.append(float(spatial["source_label_permutation_p"]))
+            out[fid] = record
             total_points += len(points)
         except Exception as exc:
-            # 3D synapse overlay is a convenience layer, not a reason to fail the research run.
+            # 3D/spatial synapse evidence is a convenience layer, not a reason to
+            # invalidate the connectome discovery run.
             out[fid] = {
                 "status": "unavailable",
                 "target": target,
@@ -123,6 +213,16 @@ def build_synapse_site_manifest(
                 "points": [],
             }
 
+    qvalues = benjamini_hochberg(spatial_pvalues)
+    for fid, q in zip(spatial_ids, qvalues):
+        spatial = out[fid]["spatial"]
+        spatial["source_label_permutation_q"] = float(q)
+        eta2 = float(spatial.get("source_segregation_eta2", 0.0))
+        if q <= 0.05 and eta2 >= 0.10:
+            spatial["pattern"] = "source_specific_territories"
+        else:
+            spatial["pattern"] = "no_strong_source_segregation_evidence"
+
     payload = {
         "dataset": DATASET,
         "server": SERVER,
@@ -130,9 +230,13 @@ def build_synapse_site_manifest(
         "coordinate_scale_to_nm": 8.0,
         "max_sources": int(max_sources),
         "max_points_per_finding": int(max_points_per_finding),
+        "spatial_permutations": int(spatial_permutations),
         "total_points": int(total_points),
         "findings": out,
-        "note": "Best-effort visualization data. Failure to query neuPrint does not invalidate the connectome discovery run.",
+        "note": (
+            "Best-effort direct-connectivity visualization and spatial evidence. "
+            "The spatial test concerns segregation among queried dopamine sources only; it is not a dopamine-versus-all-input clustering test."
+        ),
     }
     write_json(output, payload)
     return payload

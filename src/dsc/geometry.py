@@ -25,7 +25,7 @@ def _source_url(relative: str) -> str:
 
 
 def _get_json(relative: str) -> dict:
-    req = urllib.request.Request(_source_url(relative), headers={"User-Agent": "dopaminergic-state-control/0.3.0"})
+    req = urllib.request.Request(_source_url(relative), headers={"User-Agent": "dopaminergic-state-control/0.4.0"})
     with urllib.request.urlopen(req, timeout=60) as response:
         return json.loads(response.read().decode("utf-8"))
 
@@ -35,7 +35,7 @@ def _download(url: str, destination: Path) -> tuple[int, str]:
     temp = destination.with_suffix(destination.suffix + ".part")
     h = hashlib.sha256()
     size = 0
-    req = urllib.request.Request(url, headers={"User-Agent": "dopaminergic-state-control/0.3.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "dopaminergic-state-control/0.4.0"})
     with urllib.request.urlopen(req, timeout=180) as src, temp.open("wb") as dst:
         while True:
             block = src.read(4 * 1024 * 1024)

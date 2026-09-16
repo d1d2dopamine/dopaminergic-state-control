@@ -7,6 +7,7 @@ import urllib.request
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterable
 
 import pandas as pd
 import pyarrow as pa
@@ -14,18 +15,22 @@ import pyarrow.compute as pc
 import pyarrow.feather as feather
 import pyarrow.ipc as ipc
 
+from .anatomy import anatomical_pool_columns, parse_roi_info, parse_roi_value, roi_json
+from .roi_metadata import hydrate_roi_metadata
+
 BASE = "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome"
 FILES = {
     "annotations": "body-annotations-male-cns-v1.0-minconf-0.5.feather",
     "neurotransmitters": "body-neurotransmitters-male-cns-v1.0.feather",
     "edges": "connectome-weights-male-cns-v1.0-minconf-0.5.feather",
 }
+DEFAULT_CONTROL_THRESHOLDS = (1, 3, 5, 10)
 
 
 def _download(url: str, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     temp = destination.with_suffix(destination.suffix + ".part")
-    req = urllib.request.Request(url, headers={"User-Agent": "dopaminergic-state-control/0.2"})
+    req = urllib.request.Request(url, headers={"User-Agent": "dopaminergic-state-control/0.4"})
     with urllib.request.urlopen(req, timeout=120) as src, temp.open("wb") as dst:
         shutil.copyfileobj(src, dst, length=1024 * 1024)
     temp.replace(destination)
@@ -68,10 +73,41 @@ def _optional_column(df: pd.DataFrame, candidates: list[str], default: str = "un
 
 def _read_annotations(path: Path) -> pd.DataFrame:
     df = feather.read_feather(path)
-    body = _find_column(list(df.columns), ["bodyId", "body", "body_id"])
-    typ = _find_column(list(df.columns), ["type"])
+    columns = list(df.columns)
+    lower = {c.lower(): c for c in columns}
+    body = _find_column(columns, ["bodyId", "body", "body_id"])
+    typ = _find_column(columns, ["type"])
     side = _optional_column(df, ["somaSide", "side"])
     status = _optional_column(df, ["status"])
+
+    input_col = next((lower[x.lower()] for x in ["inputRois", "input_rois"] if x.lower() in lower), None)
+    output_col = next((lower[x.lower()] for x in ["outputRois", "output_rois"] if x.lower() in lower), None)
+    roi_info_col = next((lower[x.lower()] for x in ["roiInfo", "roi_info"] if x.lower() in lower), None)
+
+    # The public annotation table may omit neuropil innervation entirely. Avoid
+    # an expensive row-by-row pandas loop in that common case; the compact
+    # neuPrint fallback below will hydrate the ROI metadata when needed.
+    if not input_col and not output_col and not roi_info_col:
+        input_rois = ["[]"] * len(df)
+        output_rois = ["[]"] * len(df)
+    else:
+        input_values = df[input_col].tolist() if input_col else [None] * len(df)
+        output_values = df[output_col].tolist() if output_col else [None] * len(df)
+        roi_info_values = df[roi_info_col].tolist() if roi_info_col else [None] * len(df)
+        input_rois: list[str] = []
+        output_rois: list[str] = []
+        for input_value, output_value, roi_info_value in zip(input_values, output_values, roi_info_values):
+            ins = parse_roi_value(input_value) if input_col else []
+            outs = parse_roi_value(output_value) if output_col else []
+            if (not ins or not outs) and roi_info_col:
+                fallback_in, fallback_out = parse_roi_info(roi_info_value)
+                if not ins:
+                    ins = fallback_in
+                if not outs:
+                    outs = fallback_out
+            input_rois.append(roi_json(ins))
+            output_rois.append(roi_json(outs))
+
     out = pd.DataFrame({
         "body_id": df[body].astype("int64"),
         "type": df[typ].fillna("unknown").astype(str),
@@ -80,6 +116,8 @@ def _read_annotations(path: Path) -> pd.DataFrame:
         "superclass": _optional_column(df, ["superclass"]),
         "class": _optional_column(df, ["class"]),
         "subclass": _optional_column(df, ["subclass"]),
+        "input_rois": input_rois,
+        "output_rois": output_rois,
     })
     return out.drop_duplicates("body_id")
 
@@ -115,8 +153,16 @@ def _counter_add(counter: Counter[int], values: pd.Series) -> None:
         counter[int(key)] += int(value)
 
 
-def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_synapses: int = 3,
-                            traced_only: bool = True, refresh: bool = False) -> dict:
+def build_dopamine_snapshot(
+    raw_dir: str | Path,
+    output_dir: str | Path,
+    min_synapses: int = 3,
+    traced_only: bool = True,
+    refresh: bool = False,
+    snapshot_floor: int = 1,
+    control_thresholds: Iterable[int] = DEFAULT_CONTROL_THRESHOLDS,
+    roi_cache: str | Path | None = None,
+) -> dict:
     paths = ensure_sources(raw_dir, refresh=refresh)
     annotations = _read_annotations(paths["annotations"])
     nt = _read_nt(paths["neurotransmitters"])
@@ -126,6 +172,7 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_syn
 
     traced_mask = merged["status"].astype(str).str.lower().eq("traced")
     eligible_ids = set(merged.loc[traced_mask, "body_id"].astype(int)) if traced_only else set(merged["body_id"].astype(int))
+    merged, roi_metadata_meta = hydrate_roi_metadata(merged, eligible_ids, cache_path=roi_cache)
     dopamine_mask = merged["nt"].astype(str).str.lower().str.strip().isin(["dopamine", "da"])
     if traced_only:
         dopamine_mask &= traced_mask
@@ -138,10 +185,13 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_syn
             "Check neurotransmitter schema before continuing."
         )
 
+    thresholds = sorted({max(1, int(x)) for x in control_thresholds} | {max(1, int(min_synapses))})
+    floor = min(max(1, int(snapshot_floor)), min(thresholds))
     tables = []
-    full_in_partner_count: Counter[int] = Counter()
-    full_in_strength: Counter[int] = Counter()
+    full_in_partner_count = {t: Counter() for t in thresholds}
+    full_in_strength = {t: Counter() for t in thresholds}
     eligible_array_cache = None
+    core_array_cache = None
 
     for batch in _edge_batches(paths["edges"]):
         names = batch.schema.names
@@ -152,23 +202,25 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_syn
         post = batch.column(names.index(post_col))
         weight = batch.column(names.index(weight_col))
 
-        # Full traced-input degree/strength at the same edge threshold. This is
-        # needed for the convergence enrichment null; it prevents high-degree
-        # targets from looking interesting merely because they receive many inputs.
         if eligible_array_cache is None or eligible_array_cache.type != pre.type:
             eligible_array_cache = pa.array(sorted(eligible_ids), type=pre.type)
         eligible_pre = pc.is_in(pre, value_set=eligible_array_cache)
-        strong = pc.greater_equal(weight, pa.scalar(int(min_synapses), type=weight.type))
-        degree_batch = batch.filter(pc.and_(eligible_pre, strong)).select([post_col, weight_col]).to_pandas()
-        if not degree_batch.empty:
-            grouped = degree_batch.groupby(post_col)[weight_col].agg(["size", "sum"])
-            _counter_add(full_in_partner_count, grouped["size"])
-            _counter_add(full_in_strength, grouped["sum"])
 
-        core_arr = pa.array(sorted(core_ids), type=pre.type)
-        core_touch = pc.or_(pc.is_in(pre, value_set=core_arr), pc.is_in(post, value_set=core_arr))
-        mask = pc.and_(core_touch, strong)
-        filtered = batch.filter(mask)
+        # Whole-connectome target degrees are retained at all robustness
+        # thresholds, while the bounded one-hop snapshot itself uses the floor.
+        for threshold in thresholds:
+            strong = pc.greater_equal(weight, pa.scalar(int(threshold), type=weight.type))
+            degree_batch = batch.filter(pc.and_(eligible_pre, strong)).select([post_col, weight_col]).to_pandas()
+            if not degree_batch.empty:
+                grouped = degree_batch.groupby(post_col)[weight_col].agg(["size", "sum"])
+                _counter_add(full_in_partner_count[threshold], grouped["size"])
+                _counter_add(full_in_strength[threshold], grouped["sum"])
+
+        if core_array_cache is None or core_array_cache.type != pre.type:
+            core_array_cache = pa.array(sorted(core_ids), type=pre.type)
+        core_touch = pc.or_(pc.is_in(pre, value_set=core_array_cache), pc.is_in(post, value_set=core_array_cache))
+        floor_mask = pc.greater_equal(weight, pa.scalar(int(floor), type=weight.type))
+        filtered = batch.filter(pc.and_(core_touch, floor_mask))
         if filtered.num_rows:
             tables.append(pa.Table.from_batches([filtered]).select([pre_col, post_col, weight_col]))
 
@@ -184,19 +236,35 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_syn
         nodes = pd.concat([nodes, pd.DataFrame({
             "body_id": missing, "type": "unknown", "side": "unknown", "status": "unknown",
             "superclass": "unknown", "class": "unknown", "subclass": "unknown",
+            "input_rois": "[]", "output_rois": "[]",
             "nt": "unknown", "nt_confidence": 0.0, "predicted_nt": "unknown", "celltype_predicted_nt": "unknown",
         })], ignore_index=True)
 
-    nodes["full_in_partner_count"] = nodes["body_id"].map(lambda x: full_in_partner_count.get(int(x), 0)).astype("int64")
-    nodes["full_in_strength"] = nodes["body_id"].map(lambda x: full_in_strength.get(int(x), 0)).astype("int64")
+    for threshold in thresholds:
+        nodes[f"full_in_partner_count_t{threshold}"] = nodes["body_id"].map(
+            lambda x, t=threshold: full_in_partner_count[t].get(int(x), 0)
+        ).astype("int64")
+        nodes[f"full_in_strength_t{threshold}"] = nodes["body_id"].map(
+            lambda x, t=threshold: full_in_strength[t].get(int(x), 0)
+        ).astype("int64")
+
+    # Backwards-compatible primary columns used by older downstream tools.
+    nodes["full_in_partner_count"] = nodes[f"full_in_partner_count_t{int(min_synapses)}"]
+    nodes["full_in_strength"] = nodes[f"full_in_strength_t{int(min_synapses)}"]
+    nodes, anatomical_meta = anatomical_pool_columns(nodes, merged, eligible_ids, core_ids)
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     node_cols = [
         "body_id", "type", "side", "status", "superclass", "class", "subclass",
+        "input_rois", "output_rois", "input_roi_count", "anatomical_pool_size", "anatomical_dopamine_pool_size",
         "nt", "nt_confidence", "predicted_nt", "celltype_predicted_nt",
         "full_in_partner_count", "full_in_strength",
     ]
+    for threshold in thresholds:
+        node_cols.extend([f"full_in_partner_count_t{threshold}", f"full_in_strength_t{threshold}"])
+    # Avoid duplicate primary columns when the primary threshold is in controls.
+    node_cols = list(dict.fromkeys(node_cols))
     nodes[node_cols].sort_values("body_id").to_csv(out / "nodes.csv", index=False)
     edges.sort_values(["pre", "post"]).to_csv(out / "edges.csv", index=False)
 
@@ -204,8 +272,16 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_syn
         "dataset": "male-cns:v1.0",
         "eligible_traced_neurons": int(len(eligible_ids)),
         "dopamine_core_count": int(len(core_ids)),
-        "edge_threshold_synapses": int(min_synapses),
-        "degree_scope": "all eligible presynaptic neurons in the full MaleCNS edge table",
+        "analysis_edge_threshold_synapses": int(min_synapses),
+        "snapshot_edge_floor_synapses": int(floor),
+        "robustness_thresholds": thresholds,
+        "degree_scope": "all eligible presynaptic neurons in the full MaleCNS edge table, threshold-specific",
+        "anatomical_null": {
+            "method": "source outputRois intersect target inputRois",
+            "scope": "necessary anatomical availability, not a contact-probability model",
+            "roi_metadata": roi_metadata_meta,
+            **anatomical_meta,
+        },
     }
     (out / "snapshot_meta.json").write_text(json.dumps(snapshot_meta, indent=2), encoding="utf-8")
 
@@ -221,12 +297,17 @@ def build_dopamine_snapshot(raw_dir: str | Path, output_dir: str | Path, min_syn
         "selection": {
             "nt_selector": "consensus_nt == dopamine",
             "predicted_nt_confidence_used_for_selection": False,
-            "min_synapses": min_synapses,
+            "min_synapses": int(min_synapses),
+            "snapshot_floor": int(floor),
+            "robustness_thresholds": thresholds,
             "traced_only": traced_only,
             "dopamine_core_count": len(core_ids),
             "snapshot_node_count": int(len(nodes)),
             "snapshot_edge_count": int(len(edges)),
             "eligible_traced_neurons": int(len(eligible_ids)),
+            "anatomical_targets_available": anatomical_meta["snapshot_targets_with_anatomical_pool"],
+            "roi_metadata_source": roi_metadata_meta.get("source"),
+            "roi_metadata_output_coverage": roi_metadata_meta.get("after", {}).get("output_fraction", 0.0),
         },
     }
     (out / "source.lock.json").write_text(json.dumps(lock, indent=2), encoding="utf-8")

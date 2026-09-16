@@ -21,3 +21,12 @@ def test_ci_does_not_ship_raw_network_payload_to_overview():
     site = Path('src/dsc/site.py').read_text(encoding='utf-8')
     assert "getJSON('data/network.json')" not in app
     assert 'data_dir / "network.json"' not in site
+
+
+def test_findings_ui_exposes_v04_control_fields():
+    app = Path('site/assets/app.js').read_text(encoding='utf-8')
+    html = Path('site/findings.html').read_text(encoding='utf-8')
+    assert 'robustnessLabel' in app
+    assert 'ROI overlap' in app
+    assert 'finding-status' in html
+    assert 'survived_controls' in html

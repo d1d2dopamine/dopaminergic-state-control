@@ -1,39 +1,47 @@
-# План исследования — v0.2
+# План исследования — v0.4
 
-## Что мы сейчас делаем
+## Что изменилось
 
-Проект не моделирует СДВГ и не пытается объявлять любую странность «дофаминовым механизмом». Сейчас задача гораздо уже: автоматически находить такие особенности дофаминовой сети MaleCNS, которые остаются необычными после разумного сравнения.
+Мы больше не хотим страницу из пятидесяти «странностей». Задача v0.4 — пытаться уничтожить каждый кандидат простыми объяснениями до того, как мы вообще начнём им интересоваться.
 
-Первая версия показала важную ошибку: если сравнивать все дофаминовые клетки со всеми, огромная группа PAM задаёт «норму», а обычные DPM/PPL/PPM начинают выглядеть чудовищными выбросами. В v0.2 это убрано.
+Код теперь спрашивает не только «это большое число?», а:
 
-## Три текущих детектора
+- сохраняется ли эффект при пороге связей 1 / 3 / 5 / 10;
+- сравнивается ли нейрон именно со своим exact type;
+- есть ли похожая аномалия на противоположной стороне;
+- не тянет ли результат одна огромная связь;
+- для dopamine convergence: могли ли потенциальные presynaptic клетки вообще попадать в те же ROI, куда target получает входы;
+- если есть реальные synapse coordinates: занимают ли разные dopamine sources отдельные территории на target.
 
-### 1. Within-type outlier
+## ROI-availability null
 
-Нейрон сравнивается только с другими нейронами того же exact `type` MaleCNS. Для небольших типов статистика не притворяется надёжной: основной outlier-screen включается только при достаточном числе копий.
+Для target берём его `inputRois`. Для каждого traced source смотрим `outputRois`. Source попадает в допустимый pool, если есть хотя бы одно пересечение.
 
-### 2. Left/right mismatch
+После этого спрашиваем: при фиксированном полном in-degree target насколько необычно получить наблюдаемое число dopamine sources из этого анатомически доступного pool?
 
-Для типов с одной клеткой слева и одной справа считается простой структурный дисбаланс. Для типов с несколькими клетками на каждой стороне используется детерминированный permutation test по сторонам.
+Это лучше глобального перемешивания всего CNS, но это ещё не геометрический contact model. Два нейрона могут иметь общий ROI и всё равно физически не встречаться.
 
-Это всё ещё candidate: большая асимметрия может оказаться реальной биологией, особенностью одного specimen или проблемой реконструкции.
+Если ROI данных не хватает в flat annotations, CI пытается получить только компактные `bodyId/inputRois/outputRois` из закреплённого `male-cns:v1.0` neuPrint и кэширует ответ. Если и это недоступно, карточка не притворяется anatomy-controlled: она получает статус `global_only`, а источник/coverage ROI остаётся в `snapshot_meta.json` и Actions summary.
 
-### 3. Dopamine-input enrichment
+## Статусы findings
 
-Для каждого target считаем, сколько разных dopamine neurons реально дают ему связь ≥ заданного порога. Затем учитываем полный traced in-degree этого target по исходному MaleCNS edge table.
+- `survived_controls` — direct dopamine-input candidate прошёл ROI null и устойчивость по thresholds;
+- `survived_thresholds` — exact-type outlier устойчив по thresholds, но это не causal result;
+- `threshold_sensitive` — результат сильно зависит от cutoff;
+- `global_only` — для convergence доступен только старый global degree null;
+- `candidate` — отдельный detector дал lead, но полного набора v0.4 controls для него нет.
 
-Null задаёт вопрос: если presynaptic identities смешивались бы глобально случайно при фиксированном числе входных партнёров target, насколько необычно получить столько dopamine sources?
+`review_queue.json` содержит только первые две категории. Именно с неё стоит начинать ручной разбор.
 
-Multiple-testing correction считается против полного traced target universe. Это специально консервативнее, чем корректировать только те targets, куда dopamine уже попал.
+## Spatial synapse evidence
 
-Ограничение: null пока не знает, какие нейроны физически доступны друг другу в конкретном neuropil. Следующий сильный шаг — anatomy/ROI-conditioned null.
+Для direct dopamine-input findings CI получает реальные pre/post synapse positions из MaleCNS neuPrint. Для queried dopamine sources считается доля пространственной вариации post-sites, объясняемая source identity (`eta²`). Source labels переставляются permutation test'ом, затем p-values корректируются BH.
 
-## Как мы работаем
+Высокое значимое eta² значит: разные dopamine sources занимают различимые территории на target среди **запрошенных dopamine inputs**. Это не тест «dopamine clustered against all other transmitters».
 
-Ты не перебираешь нейроны вручную. GitHub Actions строит snapshot, считает controls и публикует findings. На сайте ты открываешь кандидат и сразу видишь реальную 3D анатомию: официальные MaleCNS neuropil meshes серым, focus neuron белым, связанные клетки серым.
+## Что после первого реального v0.4 run
 
-Если кандидат выглядит содержательно, тогда создаём `experiments/00X_name/` и делаем отдельный hypothesis test. Discovery thresholds не подгоняются под понравившийся результат.
-
-## Следующая научная цель
-
-После проверки v0.2 на реальном MaleCNS: добавить ROI-conditioned null для dopamine convergence и решить, какой из surviving candidates достоин первого `Experiment 001`.
+1. Берём `review_queue.json`.
+2. Проверяем самые устойчивые 3–10 кандидатов на reconstruction/annotation артефакты.
+3. Для оставшихся делаем глубокий literature/preprint novelty search.
+4. Только после этого выбираем `Experiment 001` и начинаем связывать конкретный circuit mechanism с D1/D2/DAT/internal-state literature.

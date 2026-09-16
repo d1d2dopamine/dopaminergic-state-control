@@ -7,6 +7,10 @@ discovery:
   top_findings: 30
   peer_min_type_size: 4
   peer_robust_z_threshold: 2.8
+  robustness_thresholds: [1, 2, 3, 5]
+  robustness_min_pass_fraction: 0.50
+  bilateral_replication_z: 2.0
+  dominant_partner_share_flag: 0.60
   bilateral_ratio_threshold: 2.5
   bilateral_min_absolute_strength: 5
   side_min_each: 2

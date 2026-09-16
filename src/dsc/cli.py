@@ -18,13 +18,16 @@ def main() -> None:
     run.add_argument("--config", default="configs/discovery.yml")
     run.add_argument("--output", default="results/current")
     run.add_argument("--site-template", default="site")
+    run.add_argument("--min-synapses", type=int, help="Override dataset.min_synapses for this analysis run")
 
     fetch = sub.add_parser("fetch-malecns", help="Build a one-hop dopamine snapshot from official MaleCNS v1.0 flat files")
     fetch.add_argument("--raw-dir", default="data/raw/male-cns-v1.0")
     fetch.add_argument("--output", default="data/derived/male-cns-v1.0-dopamine")
-    fetch.add_argument("--min-synapses", type=int, default=3)
+    fetch.add_argument("--min-synapses", type=int, default=3, help="Primary analysis threshold used for whole-connectome controls")
+    fetch.add_argument("--snapshot-floor", type=int, default=1, help="Lowest edge weight retained so robustness tests can re-threshold without re-downloading")
     fetch.add_argument("--include-nontraced", action="store_true")
     fetch.add_argument("--refresh", action="store_true")
+    fetch.add_argument("--roi-cache", help="Optional .json.gz cache for compact neuPrint inputRois/outputRois metadata")
 
     geometry = sub.add_parser("geometry-manifest", help="Build/vend official MaleCNS shell/ROI geometry and selected skeletons")
     geometry.add_argument("--output", required=True)
@@ -38,12 +41,13 @@ def main() -> None:
     syn = sub.add_parser("synapse-sites", help="Best-effort fetch of real synapse positions for direct-connectivity findings")
     syn.add_argument("--findings", required=True)
     syn.add_argument("--output", required=True)
-    syn.add_argument("--max-sources", type=int, default=8)
-    syn.add_argument("--max-points", type=int, default=2500)
+    syn.add_argument("--max-sources", type=int, default=24)
+    syn.add_argument("--max-points", type=int, default=4000)
+    syn.add_argument("--spatial-permutations", type=int, default=400)
 
     args = parser.parse_args()
     if args.command == "run":
-        manifest = run_pipeline(args.snapshot, args.config, args.output, args.site_template)
+        manifest = run_pipeline(args.snapshot, args.config, args.output, args.site_template, min_synapses_override=args.min_synapses)
         print(json.dumps(manifest, indent=2))
     elif args.command == "fetch-malecns":
         lock = build_dopamine_snapshot(
@@ -52,6 +56,8 @@ def main() -> None:
             min_synapses=args.min_synapses,
             traced_only=not args.include_nontraced,
             refresh=args.refresh,
+            snapshot_floor=args.snapshot_floor,
+            roi_cache=args.roi_cache,
         )
         print(json.dumps(lock["selection"], indent=2))
     elif args.command == "geometry-manifest":
@@ -79,6 +85,7 @@ def main() -> None:
             args.output,
             max_sources=args.max_sources,
             max_points_per_finding=args.max_points,
+            spatial_permutations=args.spatial_permutations,
         )
         print(json.dumps({
             "dataset": payload["dataset"],
