@@ -22,6 +22,8 @@ jobs:
         run: |
           node --check site/assets/app.js
           node --check site/assets/brain.js
+          node --check site/assets/state-lab.js
+          node --check site/assets/state-lab-3d.js
       - name: Rebuild demo research site
         run: dsc run --snapshot data/demo --config configs/demo.yml --output build/demo --site-template site
       - name: Verify generated site payload
@@ -31,6 +33,8 @@ jobs:
           test ! -e build/demo/site/data/network.json
           test -s build/demo/site/data/run.json
           test -s build/demo/site/assets/brain.js
+          test -s build/demo/site/assets/state-lab.js
+          test -s build/demo/site/assets/state-lab-3d.js
       - uses: actions/upload-artifact@v4
         with:
           name: discovery-demo

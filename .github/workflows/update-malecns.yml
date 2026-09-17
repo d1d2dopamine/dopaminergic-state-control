@@ -81,7 +81,8 @@ jobs:
             --vendor-dir build/research/site/data/geometry \
             --source-cache-dir "${{ runner.temp }}/male-cns-geometry-v1" \
             --findings build/research/findings.json \
-            --max-vendored-skeletons 128 \
+            --experiment build/research/experiment_001_pam04.json \
+            --max-vendored-skeletons 256 \
             --region-lod-divisions 20 \
             --shell-lod-divisions 46
       - name: Fetch real synapse positions for direct-connectivity findings
@@ -93,6 +94,14 @@ jobs:
             --max-sources 24 \
             --max-points 4000 \
             --spatial-permutations 400
+      - name: Fetch real synapse positions for PAM04 live playback
+        continue-on-error: true
+        run: |
+          dsc pam04-synapses \
+            --experiment build/research/experiment_001_pam04.json \
+            --output build/research/site/data/experiments/001_pam04_synapses.json \
+            --max-partners 10 \
+            --max-points 2500
       - name: Write research summary
         shell: bash
         run: |
@@ -109,6 +118,10 @@ jobs:
               pam04 = json.load(open('build/research/experiment_001_pam04.json', encoding='utf-8'))
           except FileNotFoundError:
               pam04 = {'available': False, 'candidate_ids': []}
+          try:
+              pam04_syn = json.load(open('build/research/site/data/experiments/001_pam04_synapses.json', encoding='utf-8'))
+          except FileNotFoundError:
+              pam04_syn = {'total_points': 0}
           statuses = Counter(f.get('status', 'candidate') for f in findings)
           kinds = Counter(f.get('kind', 'unknown') for f in findings)
           queue = [f for f in findings if f.get('status') in {'survived_controls', 'survived_thresholds'}]
@@ -116,17 +129,18 @@ jobs:
           roi_meta = anatomical.get('roi_metadata', {})
           roi_after = roi_meta.get('after', {})
           lines = [
-              '# Dopaminergic State Control v0.4.1',
+              '# Dopaminergic State Control v0.4.2',
               '',
               f"- dopamine core: {manifest['counts'].get('dopamine_core_nodes', '—')}",
               f"- findings shown: {len(findings)}",
-              f"- review queue: {len(queue)}",
+              f"- manual investigation queue: {len(queue)}",
               f"- real synapse points: {synapses.get('total_points', 0)}",
               f"- ROI metadata: {roi_meta.get('source', 'unknown')}",
               f"- ROI output coverage: {float(roi_after.get('output_fraction', 0))*100:.1f}%",
               f"- targets with anatomical pool: {anatomical.get('snapshot_targets_with_anatomical_pool', 0)} / {anatomical.get('snapshot_nodes', 0)}",
               f"- Experiment 001 PAM04: {'ready' if pam04.get('available') else 'unavailable'}",
               f"- PAM04 candidates: {', '.join(str(x) for x in pam04.get('candidate_ids', [])) or 'none'}",
+              f"- PAM04 live synapse sites: {pam04_syn.get('total_points', 0)}",
               '',
               '## Control states',
           ]

@@ -20,7 +20,7 @@ DATASET = "male-cns:v1.0"
 def _post_cypher(cypher: str, token: str | None = None, timeout: int = 120, retries: int = 3) -> dict:
     payload = json.dumps({"cypher": cypher, "dataset": DATASET}).encode("utf-8")
     headers = {
-        "User-Agent": "dopaminergic-state-control/0.4.0",
+        "User-Agent": "dopaminergic-state-control/0.4.2",
         "Content-Type": "application/json",
     }
     if token:
@@ -238,5 +238,112 @@ def build_synapse_site_manifest(
             "The spatial test concerns segregation among queried dopamine sources only; it is not a dopamine-versus-all-input clustering test."
         ),
     }
+    write_json(output, payload)
+    return payload
+
+
+def _multi_pair_synapses(pre_ids: list[int], post_ids: list[int], max_points: int, token: str | None = None) -> list[dict]:
+    """Fetch exact synapse sites for a bounded set of directed neuron pairs."""
+    pre_ids = [int(x) for x in dict.fromkeys(pre_ids) if int(x) > 0]
+    post_ids = [int(x) for x in dict.fromkeys(post_ids) if int(x) > 0]
+    if not pre_ids or not post_ids or max_points <= 0:
+        return []
+    pres = ",".join(str(x) for x in pre_ids)
+    posts = ",".join(str(x) for x in post_ids)
+    cypher = f"""
+MATCH (n:Neuron)-[:ConnectsTo]->(m:Neuron),
+      (n)-[:Contains]->(nss:SynapseSet)-[:ConnectsTo]->(mss:SynapseSet)<-[:Contains]-(m),
+      (nss)-[:Contains]->(ns:Synapse)-[:SynapsesTo]->(ms:Synapse)<-[:Contains]-(mss)
+WHERE n.bodyId IN [{pres}] AND m.bodyId IN [{posts}]
+WITH DISTINCT n, m, ns, ms
+RETURN n.bodyId AS pre, m.bodyId AS post,
+       ns.location.x AS x_pre, ns.location.y AS y_pre, ns.location.z AS z_pre,
+       ms.location.x AS x_post, ms.location.y AS y_post, ms.location.z AS z_post,
+       ns.confidence AS confidence_pre, ms.confidence AS confidence_post
+LIMIT {int(max_points)}
+""".strip()
+    response = _post_cypher(cypher, token=token)
+    columns = response.get("columns", [])
+    index = {name: i for i, name in enumerate(columns)}
+    required = ["pre", "post", "x_pre", "y_pre", "z_pre", "x_post", "y_post", "z_post"]
+    if any(k not in index for k in required):
+        raise RuntimeError(f"unexpected neuPrint columns: {columns}")
+    rows: list[dict] = []
+    for row in response.get("data", []):
+        try:
+            rows.append({
+                "pre": int(row[index["pre"]]),
+                "post": int(row[index["post"]]),
+                "pre_xyz": [int(row[index["x_pre"]]), int(row[index["y_pre"]]), int(row[index["z_pre"]])],
+                "post_xyz": [int(row[index["x_post"]]), int(row[index["y_post"]]), int(row[index["z_post"]])],
+                "confidence_pre": float(row[index["confidence_pre"]]) if "confidence_pre" in index and row[index["confidence_pre"]] is not None else None,
+                "confidence_post": float(row[index["confidence_post"]]) if "confidence_post" in index and row[index["confidence_post"]] is not None else None,
+            })
+        except (TypeError, ValueError):
+            continue
+    return rows
+
+
+def build_pam04_synapse_manifest(
+    experiment_path: str | Path,
+    output: str | Path,
+    max_partners_per_direction: int = 10,
+    max_points_per_direction: int = 2500,
+    token: str | None = None,
+) -> dict:
+    """Best-effort real synapse sites for the PAM04 State Lab candidates.
+
+    Only the strongest measured input/output partners already present in the
+    Experiment 001 dossier are queried. Failure never invalidates the structural
+    experiment; the live viewer simply falls back to skeleton-only animation.
+    """
+    experiment = json.loads(Path(experiment_path).read_text(encoding="utf-8"))
+    token = token or os.environ.get("NEUPRINT_APPLICATION_CREDENTIALS")
+    payload = {
+        "dataset": DATASET,
+        "server": SERVER,
+        "coordinate_units": "8nm voxels",
+        "coordinate_scale_to_nm": 8.0,
+        "max_partners_per_direction": int(max_partners_per_direction),
+        "max_points_per_direction": int(max_points_per_direction),
+        "candidates": {},
+        "total_points": 0,
+    }
+    if not experiment.get("available"):
+        payload["status"] = "not_applicable"
+        payload["reason"] = "Experiment 001 PAM04 data unavailable"
+        write_json(output, payload)
+        return payload
+
+    cells = {int(c["body_id"]): c for c in experiment.get("cells", [])}
+    candidate_ids = [int(x) for x in experiment.get("candidate_ids", [])]
+    for candidate in candidate_ids:
+        cell = cells.get(candidate, {})
+        input_ids = [int(x["body_id"]) for x in cell.get("top_inputs", [])[: max(0, int(max_partners_per_direction))]]
+        output_ids = [int(x["body_id"]) for x in cell.get("top_outputs", [])[: max(0, int(max_partners_per_direction))]]
+        record = {
+            "input_partner_ids": input_ids,
+            "output_partner_ids": output_ids,
+            "input_points": [],
+            "output_points": [],
+            "status": "ok",
+        }
+        errors: list[str] = []
+        try:
+            record["input_points"] = _multi_pair_synapses(input_ids, [candidate], int(max_points_per_direction), token=token)
+        except Exception as exc:
+            errors.append("input: " + str(exc)[:400])
+        try:
+            record["output_points"] = _multi_pair_synapses([candidate], output_ids, int(max_points_per_direction), token=token)
+        except Exception as exc:
+            errors.append("output: " + str(exc)[:400])
+        if errors:
+            record["status"] = "partial" if record["input_points"] or record["output_points"] else "unavailable"
+            record["errors"] = errors
+        record["point_count"] = int(len(record["input_points"]) + len(record["output_points"]))
+        payload["total_points"] += record["point_count"]
+        payload["candidates"][str(candidate)] = record
+
+    payload["status"] = "ok" if payload["total_points"] else "unavailable"
     write_json(output, payload)
     return payload

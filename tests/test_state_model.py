@@ -34,6 +34,8 @@ def test_state_model_real_matches_its_baseline():
     result = compare_pam04(experiment, params)
     assert result["summary"]["delta_peak_dopamine"] == 0.0
     assert result["baseline"]["dopamine"] == result["intervention"]["dopamine"]
+    assert result["summary"]["candidate_simulated_events"] >= 0
+    assert result["summary"]["candidate_activity_auc"] > 0
 
 
 def test_state_model_knockout_changes_candidate_response_deterministically():

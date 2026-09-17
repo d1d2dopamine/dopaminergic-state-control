@@ -4,8 +4,8 @@ message: "If you use this software or derived results, cite this repository and 
 type: software
 authors:
   - name: d1d2dopamine
-version: 0.4.1
-date-released: 2026-09-16
+version: 0.4.2
+date-released: 2026-09-17
 license: MIT
 repository-code: "https://github.com/d1d2dopamine/dopaminergic-state-control"
 keywords:

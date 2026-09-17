@@ -22,6 +22,8 @@ DEFAULT_MODEL = {
     "baseline_input": 0.08,
     "dopamine_tone": 0.04,
     "dat_clearance": 1.0,
+    "visual_event_rate_hz": 28.0,
+    "visual_pulse_travel_ms": 260,
     "receptors": {
         "Dop1R1": {
             "family": "D1-like",
@@ -101,6 +103,7 @@ def build_pam04_experiment(
     top_input_channels: int = 18,
     top_output_channels: int = 14,
     top_partners_per_cell: int = 12,
+    top_channel_members: int = 12,
 ) -> dict:
     """Build a compact browser-ready dossier/sandbox for Experiment 001.
 
@@ -225,6 +228,34 @@ def build_pam04_experiment(
             ],
         })
 
+    def input_members(name: str) -> list[dict]:
+        if name == "other":
+            return []
+        subset = incoming.loc[incoming["channel"].astype(str).eq(str(name))]
+        records = []
+        for body, group in subset.groupby("pre"):
+            group = group.groupby("post", as_index=False)["weight"].sum().sort_values("weight", ascending=False)
+            total = int(group["weight"].sum())
+            rec = _partner_record(int(body), total, node_meta, total / max(1, int(subset["weight"].sum())))
+            rec["targets"] = [{"body_id": int(r.post), "weight": int(r.weight)} for r in group.head(12).itertuples(index=False)]
+            records.append(rec)
+        records.sort(key=lambda x: (-int(x["weight"]), int(x["body_id"])))
+        return records[: max(1, int(top_channel_members))]
+
+    def output_members(name: str) -> list[dict]:
+        if name == "other":
+            return []
+        subset = outgoing.loc[outgoing["channel"].astype(str).eq(str(name))]
+        records = []
+        for body, group in subset.groupby("post"):
+            group = group.groupby("pre", as_index=False)["weight"].sum().sort_values("weight", ascending=False)
+            total = int(group["weight"].sum())
+            rec = _partner_record(int(body), total, node_meta, total / max(1, int(subset["weight"].sum())))
+            rec["sources"] = [{"body_id": int(r.pre), "weight": int(r.weight)} for r in group.head(12).itertuples(index=False)]
+            records.append(rec)
+        records.sort(key=lambda x: (-int(x["weight"]), int(x["body_id"])))
+        return records[: max(1, int(top_channel_members))]
+
     input_channels = []
     for idx, name in enumerate(input_names):
         weights = input_matrix[idx].astype(float)
@@ -233,6 +264,7 @@ def build_pam04_experiment(
             "total_weight": float(weights.sum()),
             "weights": weights.tolist(),
             "active_cells": int(np.count_nonzero(weights)),
+            "members": input_members(str(name)),
         })
     output_channels = []
     for idx, name in enumerate(output_names):
@@ -242,6 +274,7 @@ def build_pam04_experiment(
             "total_weight": float(weights.sum()),
             "weights": weights.tolist(),
             "active_cells": int(np.count_nonzero(weights)),
+            "members": output_members(str(name)),
         })
 
     values = pam["max_input_share"].astype(float)
@@ -285,5 +318,6 @@ def build_pam04_experiment(
             "Dopamine concentration, DAT clearance and receptor activation use normalized units.",
             "Dop1R1/Dop1R2/Dop2R are not assigned to individual downstream cells here because cell-specific receptor abundance is not present in the MaleCNS connectome snapshot.",
             "A simulated effect is a model sensitivity result, not evidence that the same effect occurs in a living fly.",
+            "Animated pulse fronts and event rasters are deterministic visualisations derived from the rate model; they are not recorded action potentials or measured conduction delays.",
         ],
     }

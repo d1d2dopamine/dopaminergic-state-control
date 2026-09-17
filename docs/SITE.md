@@ -4,21 +4,27 @@ The site is a compact grayscale research instrument, not a public-facing showcas
 
 ## Findings v0.4
 
-The table now exposes control status, threshold survival, null type and optional spatial synapse evidence. `review_queue.json` contains only `survived_controls` and `survived_thresholds` findings.
+The table exposes control status, threshold survival, null type and optional spatial synapse evidence. `review_queue.json` is a manual-investigation queue, not a claim that every item has passed every biological control.
 
 ## 3D specimen
 
-The v0.3 WebGL2 viewer remains intentionally lightweight: official MaleCNS context shell, focus-first real skeletons, lazy context, natural orbit/pan/zoom, camera presets, clipping and URL-preserved views.
+The standalone WebGL2 viewer remains the anatomy inspector: official MaleCNS context shell, real neuron centerlines, lazy context, natural orbit/pan/zoom, camera presets, clipping and URL-preserved views. It never draws invented neuron-to-neuron cables.
 
-v0.4 adds analysis metadata around the existing synapse overlay. For direct dopamine-input findings the sidebar can display the number of queried sites, source-segregation eta², permutation BH q and the resulting descriptive spatial pattern.
+## State Lab v0.4.2
 
-The viewer never draws an invented continuous cable between two neurons.
+`state-lab.html` is now primarily a synchronized visual playback surface for Experiment 001.
 
+The live viewer loads the same official MaleCNS brain shell used by the specimen page, all PAM04 centerlines, selected upstream partner skeletons and a bounded set of strong downstream partners. The heavy workflow additionally performs a fail-soft neuPrint query for candidate input/output synapse coordinates. When available, those real synapse sites flash during playback.
 
-## State Lab v0.4.1
+The timeline drives four linked views:
 
-`state-lab.html` is the interactive surface for Experiment 001. The build derives the PAM04 structural matrix from the same MaleCNS snapshot used by discovery. The browser compares the unmodified structural model with a counterfactual under identical stimulus/model settings.
+- real 3D anatomy whose neurite brightness follows normalized model activity;
+- moving pulse markers over real skeleton geometry;
+- a simulated-event raster derived deterministically from the rate trace;
+- a selected-neuron activity trace and compact circuit graph.
 
-Available interventions are candidate knockout, medianization of the candidate input profile, dominant-input amplification and deterministic input-channel shuffling. The dopamine/receptor controls are normalized exploratory parameters. They are intentionally labelled as assumptions because the connectome does not provide per-target Dop1R1/Dop1R2/Dop2R abundance.
+The pulse fronts and event ticks are visualization/model outputs. They are **not** recorded action potentials, calcium traces or measured MaleCNS conduction delays. The UI keeps this distinction visible because the purpose is to understand counterfactuals, not to make a static connectome look physiologically measured.
 
-The **export run JSON** action captures the parameters and source run provenance. If that JSON is committed under `experiments/001_pam04/scenarios/`, the heavy MaleCNS GitHub workflow reproduces it with the Python implementation of the same model and stores the result in the research artifact/site data.
+Available interventions remain candidate knockout, medianization of the candidate input profile, dominant-input amplification and deterministic input-channel shuffling. The dopamine/receptor controls are normalized exploratory parameters; the connectome does not provide per-target Dop1R1/Dop1R2/Dop2R abundance.
+
+The **export run JSON** action captures parameters, source provenance and activity/event summary. If that JSON is committed under `experiments/001_pam04/scenarios/`, the heavy MaleCNS workflow reproduces the underlying rate-model comparison with the Python implementation.

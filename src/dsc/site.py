@@ -53,3 +53,12 @@ def build_site(template_dir: str | Path, output_dir: str | Path, nodes: pd.DataF
     write_json(data_dir / "run.json", manifest)
     for experiment_id, payload in (experiments or {}).items():
         write_json(data_dir / "experiments" / f"{experiment_id}.json", payload)
+        if experiment_id == "001_pam04":
+            write_json(data_dir / "experiments" / "001_pam04_synapses.json", {
+                "dataset": payload.get("dataset", manifest.get("dataset")),
+                "status": "not_built",
+                "coordinate_scale_to_nm": 8.0,
+                "total_points": 0,
+                "candidates": {},
+                "note": "The heavy MaleCNS workflow overwrites this placeholder with best-effort real candidate synapse sites.",
+            })

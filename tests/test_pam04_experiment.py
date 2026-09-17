@@ -58,3 +58,14 @@ def test_pam04_experiment_gracefully_handles_snapshot_without_pam04():
     payload = build_pam04_experiment(nodes, edges, features, findings)
     assert payload["available"] is False
     assert payload["experiment_id"] == "001_pam04"
+
+
+def test_pam04_experiment_exposes_channel_members_for_live_3d_context():
+    nodes, edges, features, findings = _fixture()
+    payload = build_pam04_experiment(nodes, edges, features, findings, min_synapses=3)
+    slp = next(x for x in payload["input_channels"] if x["name"] == "SLP321")
+    assert slp["members"][0]["body_id"] == 10
+    assert any(t["body_id"] == 1 for t in slp["members"][0]["targets"])
+    mbon = next(x for x in payload["output_channels"] if x["name"] == "MBON02")
+    assert mbon["members"][0]["body_id"] == 20
+    assert {x["body_id"] for x in mbon["members"][0]["sources"]} == {1, 2}

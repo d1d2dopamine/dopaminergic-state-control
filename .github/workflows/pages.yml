@@ -23,7 +23,8 @@ jobs:
         run: |
           if [ -f data/derived/male-cns-v1.0-dopamine/nodes.csv ]; then
             dsc run --snapshot data/derived/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/pages --site-template site
-            dsc geometry-manifest --output build/pages/site/data/geometry.json --vendor-dir build/pages/site/data/geometry --findings build/pages/findings.json --max-vendored-skeletons 256
+            dsc geometry-manifest --output build/pages/site/data/geometry.json --vendor-dir build/pages/site/data/geometry --findings build/pages/findings.json --experiment build/pages/experiment_001_pam04.json --max-vendored-skeletons 256
+            dsc pam04-synapses --experiment build/pages/experiment_001_pam04.json --output build/pages/site/data/experiments/001_pam04_synapses.json --max-partners 10 --max-points 2500 || true
           else
             echo "No committed real snapshot; publishing synthetic demo preview without MaleCNS geometry manifest."
             dsc run --snapshot data/demo --config configs/demo.yml --output build/pages --site-template site

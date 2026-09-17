@@ -40,8 +40,16 @@ def test_state_lab_is_reproducible_and_explicitly_model_based():
     assert 'DAT clearance' in html
     assert 'Dop1R1 gain' in html and 'Dop1R2 gain' in html and 'Dop2R gain' in html
     assert 'export run JSON' in html
+    assert 'simulated event raster' in html
+    assert 'lab-3d-canvas' in html
+    assert 'state-lab-3d.js' in html
     assert 'simulate(p' in js
+    assert 'buildEvents' in js
     assert "data/experiments/001_pam04.json" in js
+    live3d = Path('site/assets/state-lab-3d.js').read_text(encoding='utf-8')
+    assert 'source_skeleton_url_template' in live3d
+    assert '001_pam04_synapses.json' in live3d
+    assert 'simulated pulse' in html
 
 
 def test_3d_viewer_accepts_manual_state_lab_focus():

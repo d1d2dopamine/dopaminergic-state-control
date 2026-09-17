@@ -1,46 +1,64 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>State Lab — Dopaminergic State Control</title><link rel="stylesheet" href="assets/styles.css"></head>
 <body data-page="state-lab"><header><strong>dopaminergic-state-control</strong><nav><a href="index.html">overview</a><a href="findings.html">findings</a><a href="state-lab.html" aria-current="page">state lab</a><a href="network.html">3d specimen</a><a href="runs.html">run</a></nav></header>
 <main class="lab-main">
-  <div class="lab-title-row"><div><h1>Experiment 001 — PAM04 input specialization</h1><p class="muted">Connectome-constrained counterfactual sandbox. Structure is measured; dynamics and receptor responses are explicitly model assumptions.</p></div><div class="lab-actions"><button id="lab-copy-url">copy state URL</button><button id="lab-export">export run JSON</button></div></div>
+  <div class="lab-title-row"><div><h1>Experiment 001 — PAM04 live circuit</h1><p class="muted">Real MaleCNS anatomy + real structural connectivity + simulated activity playback. The light pulses and event raster are model visualisations, not recorded physiology.</p></div><div class="lab-actions"><button id="lab-copy-url">copy state URL</button><button id="lab-export">export run JSON</button></div></div>
   <div id="lab-unavailable" class="lab-warning" hidden></div>
   <section id="lab-app" hidden>
     <div class="lab-summary" id="lab-summary"></div>
-    <div class="lab-grid">
+    <div class="lab-grid lab-grid-live">
       <aside class="lab-controls">
-        <h2>counterfactual</h2>
-        <label>mode<select id="lab-mode"><option value="real">real</option><option value="knockout">candidate knockout</option><option value="medianize">medianize candidate inputs</option><option value="amplify">amplify dominant input</option><option value="shuffle">shuffle candidate inputs</option></select></label>
+        <h2>circuit</h2>
         <label>candidate<select id="lab-candidate"></select></label>
+        <label>upstream cell-type channel<select id="lab-stimulus"></select></label>
+        <label>mode<select id="lab-mode"><option value="real">real</option><option value="knockout">candidate knockout</option><option value="medianize">medianize candidate inputs</option><option value="amplify">amplify dominant input</option><option value="shuffle">shuffle candidate inputs</option></select></label>
         <label>dominant-input multiplier <span id="lab-gain-value">2.0×</span><input class="range" id="lab-gain" type="range" min="0" max="4" value="2" step="0.1"></label>
 
         <h2>stimulus</h2>
-        <label>upstream cell-type channel<select id="lab-stimulus"></select></label>
         <label>pulse strength <span id="lab-stimulus-value">1.50</span><input class="range" id="lab-stimulus-strength" type="range" min="0" max="3" value="1.5" step="0.05"></label>
         <label>pulse start <span id="lab-pulse-start-value">450 ms</span><input class="range" id="lab-pulse-start" type="range" min="0" max="1800" value="450" step="50"></label>
         <label>pulse duration <span id="lab-pulse-duration-value">900 ms</span><input class="range" id="lab-pulse-duration" type="range" min="100" max="2200" value="900" step="50"></label>
 
-        <h2>dopamine / receptors</h2>
-        <label>dopamine tone <span id="lab-tone-value">0.04</span><input class="range" id="lab-tone" type="range" min="0" max="0.5" value="0.04" step="0.01"></label>
-        <label>DAT clearance <span id="lab-dat-value">1.00×</span><input class="range" id="lab-dat" type="range" min="0.2" max="2.5" value="1" step="0.05"></label>
-        <label>Dop1R1 gain <span id="lab-dop1r1-value">1.00×</span><input class="range" id="lab-dop1r1" type="range" min="0" max="2" value="1" step="0.05"></label>
-        <label>Dop1R2 gain <span id="lab-dop1r2-value">0.85×</span><input class="range" id="lab-dop1r2" type="range" min="0" max="2" value="0.85" step="0.05"></label>
-        <label>Dop2R gain <span id="lab-dop2r-value">0.90×</span><input class="range" id="lab-dop2r" type="range" min="0" max="2" value="0.9" step="0.05"></label>
+        <details class="lab-advanced"><summary>dopamine / receptor sandbox</summary>
+          <label>dopamine tone <span id="lab-tone-value">0.04</span><input class="range" id="lab-tone" type="range" min="0" max="0.5" value="0.04" step="0.01"></label>
+          <label>DAT clearance <span id="lab-dat-value">1.00×</span><input class="range" id="lab-dat" type="range" min="0.2" max="2.5" value="1" step="0.05"></label>
+          <label>Dop1R1 gain <span id="lab-dop1r1-value">1.00×</span><input class="range" id="lab-dop1r1" type="range" min="0" max="2" value="1" step="0.05"></label>
+          <label>Dop1R2 gain <span id="lab-dop1r2-value">0.85×</span><input class="range" id="lab-dop1r2" type="range" min="0" max="2" value="0.85" step="0.05"></label>
+          <label>Dop2R gain <span id="lab-dop2r-value">0.90×</span><input class="range" id="lab-dop2r" type="range" min="0" max="2" value="0.9" step="0.05"></label>
+        </details>
 
-        <div class="lab-buttons"><button id="lab-run">run comparison</button><button id="lab-play">play</button><button id="lab-reset">reset</button></div>
+        <div class="lab-buttons"><button id="lab-run">rebuild model</button><button id="lab-play">▶ play</button><button id="lab-reset">reset</button></div>
+        <div class="lab-playback-options"><label>speed<select id="lab-speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label><label class="inline-check"><input id="lab-loop" type="checkbox"> loop</label></div>
         <label>time <span id="lab-time-value">0 ms</span><input class="range" id="lab-time" type="range" min="0" max="100" value="0" step="1"></label>
-        <p class="lab-note">The receptor panel is a normalized exploratory layer. It does not claim measured Dop1R1/Dop1R2/Dop2R abundance on specific target neurons. Export a run JSON, place it under <code>experiments/001_pam04/scenarios/</code>, commit it, and the heavy GitHub workflow will reproduce it from the fresh MaleCNS snapshot.</p>
+        <div class="lab-step-buttons"><button id="lab-prev">◀ frame</button><button id="lab-next">frame ▶</button></div>
+        <label>brain shell opacity <span id="lab-brain-opacity-value">0.06</span><input class="range" id="lab-brain-opacity" type="range" min="0" max="0.22" value="0.055" step="0.005"></label>
+        <p class="lab-note"><strong>Important:</strong> skeletons and queried synapse positions are MaleCNS anatomy. Glow, moving pulse fronts, event ticks, receptor responses and timing are deterministic outputs/visualisations of the exploratory model.</p>
       </aside>
 
-      <section class="lab-workspace">
-        <div class="lab-panel"><div class="lab-panel-head"><h2>PAM04 population activity</h2><span id="lab-cell-note" class="muted"></span></div><div id="lab-cell-grid" class="cell-grid"></div></div>
-        <div class="lab-panel"><div class="lab-panel-head"><h2>time traces</h2><span class="muted">solid = intervention · dashed = real baseline</span></div><canvas id="lab-trace-canvas" class="lab-chart" width="1200" height="330"></canvas><div class="trace-legend"><span>DA</span><span>Dop1R1</span><span>Dop1R2</span><span>Dop2R</span><span>coupling index</span></div></div>
-        <div class="lab-two-col">
-          <div class="lab-panel"><h2>selected PAM04 dossier</h2><div id="lab-candidate-dossier"></div></div>
-          <div class="lab-panel"><h2>downstream structural drive</h2><div id="lab-output-table"></div></div>
+      <section class="lab-workspace lab-live-workspace">
+        <div class="lab-live-panel">
+          <canvas id="lab-3d-canvas" class="lab-3d-canvas"></canvas>
+          <div class="lab-3d-topbar"><span id="lab-3d-status">loading MaleCNS anatomy…</span><span id="lab-cell-note"></span></div>
+          <div class="lab-3d-legend"><span><i class="legend-line"></i> PAM04</span><span><i class="legend-line strong"></i> selected / active</span><span><i class="legend-dot"></i> real synapse site</span><span><i class="legend-pulse"></i> simulated pulse</span></div>
+          <div class="lab-3d-controls"><button id="lab-fit-candidate">fit candidate</button><button id="lab-fit-brain">fit brain</button><button id="lab-view-anterior">anterior</button><button id="lab-view-dorsal">dorsal</button><label class="inline-check"><input id="lab-follow" type="checkbox"> follow pulse</label></div>
+          <div class="lab-3d-receptors" id="lab-receptor-readout"></div>
         </div>
-        <div class="lab-panel"><h2>PAM04 max-input-share distribution</h2><div id="lab-distribution" class="distribution"></div></div>
-        <div class="lab-panel"><h2>committed CI scenarios</h2><div id="lab-committed-runs" class="muted">No committed run index in this build.</div></div><div class="lab-panel"><h2>model assumptions</h2><ul id="lab-assumptions" class="assumption-list"></ul></div>
+
+        <div class="lab-visual-grid">
+          <div class="lab-panel lab-raster-panel"><div class="lab-panel-head"><h2>simulated event raster</h2><span class="muted">ticks are derived from normalized rate activity</span></div><canvas id="lab-raster-canvas" class="lab-raster-canvas"></canvas></div>
+          <div class="lab-panel"><div class="lab-panel-head"><h2>live circuit</h2><span class="muted">real structural edges · simulated activity</span></div><canvas id="lab-circuit-canvas" class="lab-circuit-canvas"></canvas></div>
+        </div>
+
+        <div class="lab-panel"><div class="lab-panel-head"><h2>selected-neuron activity</h2><span class="muted">solid = current · dashed = real baseline</span></div><canvas id="lab-activity-canvas" class="lab-activity-canvas"></canvas></div>
+
+        <details class="lab-details"><summary>details / evidence / tables</summary>
+          <div class="lab-panel"><div class="lab-panel-head"><h2>PAM04 population activity</h2><span class="muted">normalized model rate</span></div><div id="lab-cell-grid" class="cell-grid"></div></div>
+          <div class="lab-two-col"><div class="lab-panel"><h2>selected PAM04 dossier</h2><div id="lab-candidate-dossier"></div></div><div class="lab-panel"><h2>downstream structural drive</h2><div id="lab-output-table"></div></div></div>
+          <div class="lab-panel"><h2>PAM04 max-input-share distribution</h2><div id="lab-distribution" class="distribution"></div></div>
+          <div class="lab-panel"><h2>committed CI scenarios</h2><div id="lab-committed-runs" class="muted">No committed run index in this build.</div></div>
+          <div class="lab-panel"><h2>model assumptions</h2><ul id="lab-assumptions" class="assumption-list"></ul></div>
+        </details>
       </section>
     </div>
   </section>
 </main>
-<script src="assets/app.js"></script><script src="assets/state-lab.js"></script></body></html>
+<script src="assets/app.js"></script><script src="assets/state-lab-3d.js"></script><script src="assets/state-lab.js"></script></body></html>

@@ -54,3 +54,19 @@ def test_finding_skeleton_order_prioritizes_focus(tmp_path: Path):
         {'focus_node': 20, 'related_nodes': [10, 21]},
     ]))
     assert _finding_skeleton_ids(path) == [10, 20, 11, 12, 21]
+
+
+def test_experiment_skeleton_ids_prioritize_live_lab_population(tmp_path):
+    import json
+    from dsc.geometry import _experiment_skeleton_ids
+    payload = {
+        "available": True,
+        "candidate_ids": [1],
+        "cells": [
+            {"body_id": 1, "top_inputs": [{"body_id": 10}], "top_outputs": [{"body_id": 20}]},
+            {"body_id": 2, "top_inputs": [{"body_id": 11}], "top_outputs": [{"body_id": 21}]},
+        ],
+    }
+    p = tmp_path / "experiment.json"
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    assert _experiment_skeleton_ids(p) == [1, 2, 10, 20]

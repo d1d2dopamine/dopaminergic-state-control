@@ -1,0 +1,8 @@
+{
+  "mode": "medianize",
+  "candidate": "186566",
+  "stimulus": "MBON13",
+  "stimulus_strength": 1.5,
+  "pulse_start_ms": 450,
+  "pulse_duration_ms": 900
+}

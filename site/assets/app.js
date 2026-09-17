@@ -29,7 +29,7 @@ async function overview(){
   const [findings, reviewQueue, run, synapses, pam04] = await Promise.all([getJSON('data/findings.json'), getJSONOptional('data/review_queue.json'), getJSON('data/run.json'), getJSONOptional('data/synapses.json'), getJSONOptional('data/experiments/001_pam04.json')]);
   const counts=run.counts||{};
   const s = [
-    ['dataset',run.dataset],['dopamine core',counts.dopamine_core_nodes??'—'],['snapshot nodes',counts.snapshot_nodes??'—'],['snapshot edges',counts.snapshot_edges??'—'],['review queue',counts.review_queue??'—']
+    ['dataset',run.dataset],['dopamine core',counts.dopamine_core_nodes??'—'],['snapshot nodes',counts.snapshot_nodes??'—'],['snapshot edges',counts.snapshot_edges??'—'],['manual investigation queue',counts.review_queue??'—']
   ];
   document.querySelector('#summary').innerHTML=s.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(fmt(v))}</dd></div>`).join('');
   const review=Array.isArray(reviewQueue)?reviewQueue:[];
@@ -37,7 +37,7 @@ async function overview(){
   document.querySelector('#top-table').innerHTML=findingRows(displayed,synapses);
   const m=run.snapshot_meta||{},a=m.anatomical_null||{},roi=a.roi_metadata||{},coverage=roi.after?.output_fraction;
   const exp=document.querySelector('#experiment-note');if(exp)exp.innerHTML=pam04?.available?`PAM04 dossier ready: ${esc(pam04.cell_count)} cells; candidates ${esc((pam04.candidate_ids||[]).join(', ')||'none')}. <a href="state-lab.html">open State Lab</a>`:'PAM04 State Lab is unavailable in this snapshot.';
-  document.querySelector('#method-note').textContent=`v0.4.1 ${review.length?'review queue':'no surviving review candidates; showing highest raw leads'}; primary threshold ${run.effective_analysis?.min_synapses??'—'}; ROI metadata ${roi.source??'unknown'}${Number.isFinite(Number(coverage))?` (${(Number(coverage)*100).toFixed(1)}% output coverage)`:''}; anatomical pools ${a.snapshot_targets_with_anatomical_pool??0}/${a.snapshot_nodes??0}; robustness thresholds ${(run.effective_analysis?.robustness_thresholds||[]).join(', ')}.`;
+  document.querySelector('#method-note').textContent=`v0.4.2 ${review.length?'manual investigation queue':'no threshold-surviving manual candidates; showing highest raw leads'}; primary threshold ${run.effective_analysis?.min_synapses??'—'}; ROI metadata ${roi.source??'unknown'}${Number.isFinite(Number(coverage))?` (${(Number(coverage)*100).toFixed(1)}% output coverage)`:''}; anatomical pools ${a.snapshot_targets_with_anatomical_pool??0}/${a.snapshot_nodes??0}; robustness thresholds ${(run.effective_analysis?.robustness_thresholds||[]).join(', ')}.`;
 }
 async function findingsPage(){
   const [findings,synapses]=await Promise.all([getJSON('data/findings.json'),getJSONOptional('data/synapses.json')]);

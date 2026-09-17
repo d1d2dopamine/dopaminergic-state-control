@@ -9,7 +9,7 @@ import numpy as np
 
 from .io import write_json
 
-MODEL_VERSION = "pam04-rate-v1"
+MODEL_VERSION = "pam04-rate-v2-live"
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -33,6 +33,17 @@ def _seeded_shuffle(values: np.ndarray, seed: int) -> np.ndarray:
         j = state % (i + 1)
         out[i], out[j] = out[j], out[i]
     return out
+
+
+def _rate_event_count(series: list[float], body_id: int, dt_ms: float, max_rate_hz: float) -> int:
+    phase = (int(body_id) % 17) / 17.0
+    count = 0
+    for value in series:
+        phase += max(0.0, float(value)) * float(max_rate_hz) * float(dt_ms) / 1000.0
+        while phase >= 1.0:
+            count += 1
+            phase -= 1.0
+    return count
 
 
 def default_parameters(experiment: dict) -> dict:
@@ -214,8 +225,20 @@ def compare_pam04(experiment: dict, scenario: dict | None) -> dict:
         (max(frame[i] for frame in intervention["cell_activity"]) for i in selected),
         default=0.0,
     )
+    dt_ms = float(experiment.get("model", {}).get("dt_ms", 20.0))
+    max_event_rate = float(experiment.get("model", {}).get("visual_event_rate_hz", 28.0))
+    cells = experiment.get("cells", [])
+    candidate_auc = float(sum(
+        sum(float(frame[i]) for frame in intervention["cell_activity"]) * dt_ms
+        for i in selected
+    ))
+    candidate_events = int(sum(
+        _rate_event_count([float(frame[i]) for frame in intervention["cell_activity"]], int(cells[i]["body_id"]), dt_ms, max_event_rate)
+        for i in selected
+    ))
     base_peak = max(baseline["dopamine"], default=0.0)
     int_peak = max(intervention["dopamine"], default=0.0)
+    dopamine_auc = float(sum(intervention["dopamine"]) * dt_ms)
     return {
         "experiment": experiment.get("experiment_id"),
         "dataset": experiment.get("dataset"),
@@ -226,6 +249,9 @@ def compare_pam04(experiment: dict, scenario: dict | None) -> dict:
             "intervention_peak_dopamine": float(int_peak),
             "delta_peak_dopamine": float(int_peak - base_peak),
             "selected_candidate_peak_activity": float(peak_candidate),
+            "candidate_activity_auc": candidate_auc,
+            "candidate_simulated_events": candidate_events,
+            "dopamine_auc": dopamine_auc,
         },
         "baseline": baseline,
         "intervention": intervention,

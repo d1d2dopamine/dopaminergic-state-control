@@ -17,7 +17,9 @@ The build generates a dossier for all PAM04 neurons at the configured primary ed
 
 ## State Lab
 
-The static research site contains an interactive browser-only sandbox. It compares the real structural profile against counterfactuals using identical model parameters:
+The static research site contains an interactive browser-only sandbox. v0.4.2 presents it as a live 3D playback: official MaleCNS skeletons brighten with normalized model activity, deterministic pulse markers move over the real geometry, best-effort real candidate synapse sites flash, and a synchronized simulated-event raster/activity trace shows the same timeline. These event ticks are derived from the rate model and are not recorded spikes.
+
+The lab compares the real structural profile against counterfactuals using identical model parameters:
 
 - `real` — measured connectome weights;
 - `knockout` — selected candidate PAM04 activity is forced to zero;

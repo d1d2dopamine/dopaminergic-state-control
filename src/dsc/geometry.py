@@ -196,6 +196,36 @@ def _finding_skeleton_ids(findings_path: str | Path | None) -> list[int]:
     return ordered
 
 
+def _experiment_skeleton_ids(experiment_path: str | Path | None) -> list[int]:
+    if experiment_path is None:
+        return []
+    payload = json.loads(Path(experiment_path).read_text(encoding="utf-8"))
+    if not payload.get("available"):
+        return []
+    ordered: list[int] = []
+    seen: set[int] = set()
+    def add(value) -> None:
+        if value is None:
+            return
+        body = int(value)
+        if body not in seen:
+            seen.add(body)
+            ordered.append(body)
+    for body in payload.get("candidate_ids", []):
+        add(body)
+    for cell in payload.get("cells", []):
+        add(cell.get("body_id"))
+    candidate_set = {int(x) for x in payload.get("candidate_ids", [])}
+    for cell in payload.get("cells", []):
+        if int(cell.get("body_id", -1)) not in candidate_set:
+            continue
+        for partner in cell.get("top_inputs", []):
+            add(partner.get("body_id"))
+        for partner in cell.get("top_outputs", []):
+            add(partner.get("body_id"))
+    return ordered
+
+
 def _build_major_shell(
     vendor_root: Path,
     source_root: Path,
@@ -313,6 +343,7 @@ def build_geometry_manifest(
     output: str | Path,
     vendor_dir: str | Path | None = None,
     findings_path: str | Path | None = None,
+    experiment_path: str | Path | None = None,
     max_vendored_skeletons: int = 128,
     region_lod_divisions: int = 20,
     source_cache_dir: str | Path | None = None,
@@ -355,7 +386,9 @@ def build_geometry_manifest(
         if span > 0:
             display_scale = 90.0 / span
 
-    skeleton_ids = _finding_skeleton_ids(findings_path)
+    experiment_skeleton_ids = _experiment_skeleton_ids(experiment_path)
+    finding_skeleton_ids = _finding_skeleton_ids(findings_path)
+    skeleton_ids = list(dict.fromkeys(experiment_skeleton_ids + finding_skeleton_ids))
     skeleton_ids_to_vendor = skeleton_ids[: max(0, int(max_vendored_skeletons))]
     vendored_skeleton_ids: list[int] = []
     skeleton_files: list[dict] = []
@@ -404,7 +437,8 @@ def build_geometry_manifest(
         "source_skeleton_url_template": _source_url(SKELETON_ROOT) + "{body_id}",
         "local_skeleton_url_template": "data/geometry/skeletons/{body_id}.bin" if vendor_root else None,
         "vendored_skeleton_ids": vendored_skeleton_ids,
-        "finding_skeleton_ids_total": len(skeleton_ids),
+        "finding_skeleton_ids_total": len(finding_skeleton_ids),
+        "experiment_skeleton_ids_total": len(experiment_skeleton_ids),
         "max_vendored_skeletons": int(max_vendored_skeletons),
         "display_center": display_center,
         "display_scale": float(display_scale),

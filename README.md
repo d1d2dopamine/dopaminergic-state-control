@@ -2,23 +2,23 @@
 
 Reproducible discovery engine for unusual structure in the dopaminergic neighborhood of the **Drosophila MaleCNS v1.0** connectome.
 
-The practical loop is: commit code → GitHub Actions fetches/processes the pinned connectome → statistical controls run → the project site shows a review queue and real 3D MaleCNS anatomy.
+The practical loop is: commit code → GitHub Actions fetches/processes the pinned connectome → statistical controls run → the project site shows a manual investigation queue and real 3D MaleCNS anatomy.
 
-## v0.4.1 — Experiment 001 / State Lab
+## v0.4.2 — Live State Lab
 
-v0.4 shifts the project from broad anomaly discovery toward candidates that survive explicit attempts to explain them away.
+`v0.4.2` keeps the Experiment 001 PAM04 counterfactual model, but changes the main interaction from tables to a **live 3D circuit playback**.
 
-`v0.4.1` keeps the v0.4 scientific filtering layer and adds the first mechanistic follow-up instead of expanding the generic detector surface.
+- the State Lab now renders the official MaleCNS brain shell and PAM04 skeletons directly in the experiment page;
+- all 32 PAM04 centerlines are loaded, while the selected upstream partners and strongest downstream partners are added as the active circuit context;
+- selected PAM04 neurites brighten with model activity and deterministic pulse markers travel over the real skeleton geometry;
+- candidate input/output synapses are queried best-effort from MaleCNS neuPrint and flash at their real coordinates when the relevant simulated event reaches that stage;
+- a synchronized **simulated-event raster**, selected-neuron activity trace and compact live circuit graph move with the same timeline;
+- playback has pause, frame stepping, 0.25×–4× speed, loop, camera presets, fit controls and optional pulse-following;
+- `real`, `knockout`, `medianize`, `amplify` and deterministic `shuffle` remain available and update the visual playback;
+- exported run JSON now records additional activity/event summaries and explicitly records that event ticks and pulse travel are visual/model outputs rather than physiological recordings;
+- geometry CI vendors the Experiment 001 PAM04 population plus candidate partner skeletons so the live lab does not depend on dozens of browser-time remote skeleton requests.
 
-- **Experiment 001 — PAM04 input specialization** is generated automatically from the same pinned MaleCNS snapshot and exact discovery results;
-- all PAM04 cells receive a compact structural dossier with exact-type metrics, strongest partners and aggregated upstream/downstream cell-type channels;
-- the research site gains a **State Lab** for real-vs-counterfactual comparison (`real`, `knockout`, `medianize`, `amplify`, deterministic `shuffle`);
-- browser dynamics are a normalized phenomenological rate model, clearly separated from measured connectome structure;
-- the State Lab exposes exploratory dopamine tone, DAT clearance and `Dop1R1` / `Dop1R2` / `Dop2R` response channels without pretending that MaleCNS contains per-target receptor abundance;
-- every browser state can be exported as JSON; committed JSON files under `experiments/001_pam04/scenarios/` are reproduced by GitHub Actions against the fresh experiment data;
-- State Lab links directly to the real 3D skeleton of the selected PAM04 cell.
-
-The dynamic/receptor layer is a sensitivity sandbox, not a claim about measured firing, receptor concentration or behavior. A useful result is one that survives structural controls and remains stable across reasonable model parameters.
+The distinction is deliberate: **anatomy/connectivity are measured structure; glow, pulse timing, event ticks and receptor dynamics are simulated.** The viewer is for understanding and counterfactual comparison, not for pretending that MaleCNS contains electrophysiology.
 
 ### v0.4 scientific filtering retained
 
@@ -39,9 +39,9 @@ A candidate is still a lead, not a mechanism. ROI overlap is a necessary anatomi
 
 ## Research site
 
-`overview` → run counts + current review queue  
+`overview` → run counts + current manual investigation queue  
 `findings` → filterable candidates with control status, robustness, null model and optional spatial synapse evidence  
-`state lab` → Experiment 001 PAM04 dossier + counterfactual simulation + receptor sandbox  
+`state lab` → live 3D PAM04 circuit playback + event raster + counterfactual/receptor sandbox  
 `3d specimen` → official MaleCNS shell + real selected neuron skeletons + applicable synapse sites  
 `run` → exact commit, hashes, thresholds and data scope
 
@@ -71,7 +71,8 @@ dsc run \
 dsc geometry-manifest \
   --output build/research/site/data/geometry.json \
   --vendor-dir build/research/site/data/geometry \
-  --findings build/research/findings.json
+  --findings build/research/findings.json \
+  --experiment build/research/experiment_001_pam04.json
 
 dsc synapse-sites \
   --findings build/research/findings.json \
@@ -79,6 +80,10 @@ dsc synapse-sites \
   --max-sources 24 \
   --max-points 4000 \
   --spatial-permutations 400
+
+dsc pam04-synapses \
+  --experiment build/research/experiment_001_pam04.json \
+  --output build/research/site/data/experiments/001_pam04_synapses.json
 ```
 
 ## Data provenance

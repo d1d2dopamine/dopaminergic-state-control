@@ -6,7 +6,7 @@ import json
 from .geometry import build_geometry_manifest
 from .malecns import build_dopamine_snapshot
 from .pipeline import run_pipeline
-from .synapses import build_synapse_site_manifest
+from .synapses import build_pam04_synapse_manifest, build_synapse_site_manifest
 from .state_model import run_scenario_file
 
 
@@ -34,6 +34,7 @@ def main() -> None:
     geometry.add_argument("--output", required=True)
     geometry.add_argument("--vendor-dir")
     geometry.add_argument("--findings")
+    geometry.add_argument("--experiment")
     geometry.add_argument("--max-vendored-skeletons", type=int, default=128)
     geometry.add_argument("--region-lod-divisions", type=int, default=20)
     geometry.add_argument("--shell-lod-divisions", type=int, default=46)
@@ -45,6 +46,13 @@ def main() -> None:
     syn.add_argument("--max-sources", type=int, default=24)
     syn.add_argument("--max-points", type=int, default=4000)
     syn.add_argument("--spatial-permutations", type=int, default=400)
+
+
+    pam_syn = sub.add_parser("pam04-synapses", help="Best-effort real synapse sites for Experiment 001 live 3D playback")
+    pam_syn.add_argument("--experiment", required=True)
+    pam_syn.add_argument("--output", required=True)
+    pam_syn.add_argument("--max-partners", type=int, default=10)
+    pam_syn.add_argument("--max-points", type=int, default=2500)
 
     sim = sub.add_parser("pam04-simulate", help="Reproduce a committed Experiment 001 State Lab scenario")
     sim.add_argument("--experiment", required=True, help="Generated experiment_001_pam04.json")
@@ -71,6 +79,7 @@ def main() -> None:
             args.output,
             vendor_dir=args.vendor_dir,
             findings_path=args.findings,
+            experiment_path=args.experiment,
             max_vendored_skeletons=args.max_vendored_skeletons,
             region_lod_divisions=args.region_lod_divisions,
             shell_lod_divisions=args.shell_lod_divisions,
@@ -97,6 +106,19 @@ def main() -> None:
             "dataset": payload["dataset"],
             "total_points": payload["total_points"],
             "findings": len(payload["findings"]),
+        }, indent=2))
+    elif args.command == "pam04-synapses":
+        payload = build_pam04_synapse_manifest(
+            args.experiment,
+            args.output,
+            max_partners_per_direction=args.max_partners,
+            max_points_per_direction=args.max_points,
+        )
+        print(json.dumps({
+            "dataset": payload["dataset"],
+            "status": payload.get("status"),
+            "candidates": len(payload.get("candidates", {})),
+            "total_points": payload.get("total_points", 0),
         }, indent=2))
     elif args.command == "pam04-simulate":
         payload = run_scenario_file(args.experiment, args.scenario, args.output)

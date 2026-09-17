@@ -28,3 +28,4 @@ experiments:
     top_input_channels: 18
     top_output_channels: 14
     top_partners_per_cell: 12
+    top_channel_members: 12

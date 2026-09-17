@@ -61,6 +61,7 @@ def run_pipeline(
         top_input_channels=int(config.get("experiments", {}).get("pam04", {}).get("top_input_channels", 18)),
         top_output_channels=int(config.get("experiments", {}).get("pam04", {}).get("top_output_channels", 14)),
         top_partners_per_cell=int(config.get("experiments", {}).get("pam04", {}).get("top_partners_per_cell", 12)),
+        top_channel_members=int(config.get("experiments", {}).get("pam04", {}).get("top_channel_members", 12)),
     )
     write_json(output / "experiment_001_pam04.json", pam04)
     manifest.setdefault("experiments", {})["001_pam04"] = {
