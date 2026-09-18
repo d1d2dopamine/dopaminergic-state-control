@@ -42,6 +42,9 @@ def test_pam04_experiment_contains_measured_structure_and_candidates():
     cell = next(x for x in payload["cells"] if x["body_id"] == 1)
     assert cell["top_inputs"][0]["body_id"] == 10
     assert cell["top_outputs"][0]["type"] == "MBON02"
+    other = next(x for x in payload["cells"] if x["body_id"] == 2)
+    assert other["state_lab_focus"] is True
+    assert other["candidate"] is False
 
 
 def test_pam04_experiment_marks_dynamic_and_receptor_layers_as_assumptions():

@@ -72,7 +72,13 @@ def test_global_bilateral_outliers_do_not_count_as_subtype_replication():
     from dsc.replication import _replication_overall
 
     overall = _replication_overall({
-        "male_cns": {"connectivity_tested": True},
+        "male_cns": {
+            "connectivity_tested": True,
+            "cells": [{
+                "id": "male1", "candidate": True, "known_subtype": "PAM04-dd",
+                "within_subtype_robust_z": 4.2, "within_subtype_outlier": True,
+            }],
+        },
         "banc": {
             "connectivity_tested": True,
             "subtypes": [],
@@ -85,4 +91,61 @@ def test_global_bilateral_outliers_do_not_count_as_subtype_replication():
         },
     })
     assert overall["status"] == "external_subtype_resolution_insufficient"
-    assert overall["external_connectomes_with_bilateral_within_subtype_motif"] == 0
+    assert overall["external_connectomes_supporting_persisting_male_subtype"] == 0
+
+
+def test_cross_subtype_left_and_right_outliers_are_not_bilateral_replication():
+    rows = []
+    for subtype, prefix in [("PAM04-dd", "d"), ("PAM04-can", "c")]:
+        for i in range(4):
+            rows.append({
+                "id": f"{prefix}{i}",
+                "cell_type": "PAM04",
+                "side": "left" if i < 2 else "right",
+                "hemibrain": subtype,
+                "proofread": True,
+            })
+    meta = pd.DataFrame(rows)
+    edges = []
+    for rid in meta["id"]:
+        dominant = rid in {"d0", "c2"}
+        weights = [80, 2, 2, 2] if dominant else [13, 12, 11, 10]
+        for j, weight in enumerate(weights):
+            edges.append({"pre": f"src{j}", "post": rid, "count": weight})
+    result = analyze_pam04_connectivity(
+        meta, pd.DataFrame(edges), dataset="synthetic", id_col="id",
+        type_col="cell_type", side_col="side", hemibrain_type_col="hemibrain",
+        pre_col="pre", post_col="post", weight_col="count", min_count=1,
+        proofread_col="proofread", outlier_z=3.0, min_subtype_peers=4,
+    )
+    assert result["motif"]["within_subtype_outlier_count"] == 2
+    assert result["motif"]["within_subtype_bilateral"] is False
+    assert not any(row["within_subtype_bilateral"] for row in result["subtypes"])
+
+
+def test_male_candidate_explained_by_subtype_stops_replication_claim():
+    from dsc.replication import _replication_overall
+
+    datasets = {
+        "male_cns": {
+            "connectivity_tested": True,
+            "cells": [{
+                "id": "male1", "candidate": True, "known_subtype": "PAM04-dd",
+                "within_subtype_robust_z": 0.4, "within_subtype_outlier": False,
+            }],
+        },
+        "banc": {
+            "connectivity_tested": True,
+            "subtypes": [{"subtype": "PAM04-dd", "within_subtype_tested": True}],
+        },
+        "flywire": {
+            "connectivity_tested": True,
+            "subtypes": [{"subtype": "PAM04-dd", "within_subtype_tested": True}],
+        },
+    }
+    cross = {
+        "banc": [{"male_id": "male1", "status": "same_subtype_bilateral_outlier"}],
+        "flywire": [{"male_id": "male1", "status": "same_subtype_bilateral_outlier"}],
+    }
+    overall = _replication_overall(datasets, cross)
+    assert overall["status"] == "male_candidate_explained_by_known_subtype"

@@ -192,6 +192,8 @@ def analyze_pam04_connectivity(
 
     subtype_rows = []
     for subtype, group in cells.dropna(subset=["known_subtype"]).groupby("known_subtype"):
+        within_mask = group["within_subtype_outlier"]
+        within_subset = group.loc[within_mask]
         subtype_rows.append({
             "subtype": subtype,
             "n": int(len(group)),
@@ -202,11 +204,16 @@ def analyze_pam04_connectivity(
             "global_outliers": group.loc[group["global_outlier"], "id"].astype(str).tolist(),
             "within_subtype_outliers": group.loc[group["within_subtype_outlier"], "id"].astype(str).tolist(),
             "within_subtype_tested": bool(len(group) >= int(min_subtype_peers)),
+            "within_subtype_bilateral": bool(
+                within_subset["side"].eq("L").any() and within_subset["side"].eq("R").any()
+            ),
         })
 
     def _bilateral(mask: pd.Series) -> bool:
         subset = cells.loc[mask]
         return bool(subset["side"].eq("L").any() and subset["side"].eq("R").any())
+
+    within_subtype_bilateral = any(row["within_subtype_bilateral"] for row in subtype_rows)
 
     out_records = []
     for rec in cells.to_dict("records"):
@@ -232,7 +239,10 @@ def analyze_pam04_connectivity(
             "global_outlier_count": int(cells["global_outlier"].sum()),
             "global_bilateral": _bilateral(cells["global_outlier"]),
             "within_subtype_outlier_count": int(cells["within_subtype_outlier"].sum()),
-            "within_subtype_bilateral": _bilateral(cells["within_subtype_outlier"]),
+            # Bilateral recurrence must occur inside the *same* annotated
+            # subtype. A left outlier in PAM04-dd plus a right outlier in
+            # PAM04-can is not a bilateral within-subtype motif.
+            "within_subtype_bilateral": bool(within_subtype_bilateral),
         },
     }
 
@@ -252,6 +262,7 @@ def male_cns_from_experiment(experiment: dict, outlier_z: float = 3.5, min_subty
             "input_strength": float(metrics.get("in_strength", 0.0) or 0.0),
             "input_partners": int(metrics.get("in_partner_count", 0) or 0),
             "candidate": bool(cell.get("candidate")),
+            "candidate_status": cell.get("candidate_status"),
         })
     cells = pd.DataFrame(rows)
     if cells.empty:
@@ -265,6 +276,7 @@ def male_cns_from_experiment(experiment: dict, outlier_z: float = 3.5, min_subty
 
     subtype_rows = []
     for subtype, group in cells.dropna(subset=["known_subtype"]).groupby("known_subtype"):
+        within_subset = group.loc[group["within_subtype_outlier"]]
         subtype_rows.append({
             "subtype": subtype,
             "n": int(len(group)),
@@ -274,6 +286,9 @@ def male_cns_from_experiment(experiment: dict, outlier_z: float = 3.5, min_subty
             "global_outliers": group.loc[group["global_outlier"], "id"].tolist(),
             "within_subtype_outliers": group.loc[group["within_subtype_outlier"], "id"].tolist(),
             "within_subtype_tested": bool(len(group) >= int(min_subtype_peers)),
+            "within_subtype_bilateral": bool(
+                within_subset["side"].eq("L").any() and within_subset["side"].eq("R").any()
+            ),
         })
 
     out = []
@@ -289,6 +304,8 @@ def male_cns_from_experiment(experiment: dict, outlier_z: float = 3.5, min_subty
         g = cells.loc[cells[column]]
         return bool(g["side"].eq("L").any() and g["side"].eq("R").any())
 
+    within_subtype_bilateral = any(row["within_subtype_bilateral"] for row in subtype_rows)
+
     return {
         "dataset": "male-cns:v1.0",
         "available": True,
@@ -302,7 +319,7 @@ def male_cns_from_experiment(experiment: dict, outlier_z: float = 3.5, min_subty
             "global_outlier_count": int(cells["global_outlier"].sum()),
             "global_bilateral": bilateral("global_outlier"),
             "within_subtype_outlier_count": int(cells["within_subtype_outlier"].sum()),
-            "within_subtype_bilateral": bilateral("within_subtype_outlier"),
+            "within_subtype_bilateral": bool(within_subtype_bilateral),
         },
     }
 
@@ -325,8 +342,10 @@ def _candidate_resolution(male: dict, external: dict) -> list[dict]:
             continue
         if not ext.get("within_subtype_tested"):
             status = "external_subtype_too_small"
+        elif ext.get("within_subtype_bilateral"):
+            status = "same_subtype_bilateral_outlier"
         elif ext.get("within_subtype_outliers"):
-            status = "same_subtype_contains_outlier"
+            status = "same_subtype_unilateral_outlier"
         else:
             status = "same_subtype_no_outlier"
         rows.append({
@@ -339,7 +358,16 @@ def _candidate_resolution(male: dict, external: dict) -> list[dict]:
     return rows
 
 
-def _replication_overall(datasets: dict[str, dict]) -> dict:
+def _replication_overall(datasets: dict[str, dict], candidate_cross_dataset: dict[str, list[dict]] | None = None) -> dict:
+    candidate_cross_dataset = candidate_cross_dataset or {}
+    male = datasets.get("male_cns", {})
+    male_candidates = [cell for cell in male.get("cells", []) if cell.get("candidate")]
+    male_testable = [
+        cell for cell in male_candidates
+        if cell.get("known_subtype") and cell.get("within_subtype_robust_z") is not None
+    ]
+    male_persisting = [cell for cell in male_testable if cell.get("within_subtype_outlier")]
+
     tested_external = [
         value for key, value in datasets.items()
         if key != "male_cns" and value.get("connectivity_tested")
@@ -351,26 +379,42 @@ def _replication_overall(datasets: dict[str, dict]) -> dict:
     # The replication target is explicitly *within known subtype*. A global
     # bilateral PAM04 outlier is context, not replication, because known
     # subtype structure could explain it.
-    supporting = [
-        value for value in subtype_testable
-        if value.get("motif", {}).get("within_subtype_bilateral")
-    ]
-    if not tested_external:
+    supporting_dataset_names = []
+    persisting_ids = {str(cell.get("id")) for cell in male_persisting}
+    for dataset_name, rows in candidate_cross_dataset.items():
+        if any(
+            str(row.get("male_id")) in persisting_ids
+            and row.get("status") == "same_subtype_bilateral_outlier"
+            for row in rows
+        ):
+            supporting_dataset_names.append(dataset_name)
+
+    if male_candidates and male_testable and not male_persisting:
+        status = "male_candidate_explained_by_known_subtype"
+    elif male_candidates and not male_testable:
+        status = "male_subtype_resolution_insufficient"
+    elif not male_candidates:
+        status = "no_control_surviving_male_candidate"
+    elif not tested_external:
         status = "external_connectivity_not_available"
     elif not subtype_testable:
         status = "external_subtype_resolution_insufficient"
-    elif len(subtype_testable) >= 2 and len(supporting) == len(subtype_testable):
+    elif len(tested_external) >= 2 and len(supporting_dataset_names) >= 2:
         status = "motif_seen_in_both_external_connectomes"
-    elif supporting:
+    elif supporting_dataset_names:
         status = "motif_seen_in_at_least_one_external_connectome"
     else:
         status = "motif_not_seen_in_tested_external_connectomes"
     return {
         "status": status,
+        "male_candidates": len(male_candidates),
+        "male_candidates_with_subtype_test": len(male_testable),
+        "male_candidates_persisting_within_subtype": len(male_persisting),
         "external_connectomes_tested": len(tested_external),
         "external_connectomes_with_subtype_test": len(subtype_testable),
-        "external_connectomes_with_bilateral_within_subtype_motif": len(supporting),
-        "note": "This is a structural falsification/replication summary. Global PAM04 outliers are not counted as replication unless the motif also survives explicit known-subtype conditioning.",
+        "external_connectomes_supporting_persisting_male_subtype": len(supporting_dataset_names),
+        "supporting_external_datasets": sorted(supporting_dataset_names),
+        "note": "Structural replication requires a control-surviving MaleCNS candidate to persist within an explicit known subtype and the same subtype to show bilateral within-subtype outliers in an external connectome. Global or cross-subtype bilateral PAM04 outliers do not count.",
     }
 
 
@@ -476,7 +520,7 @@ def build_pam04_replication(
                 "error": f"{type(exc).__name__}: {exc}",
             }
 
-    report["overall"] = _replication_overall(report["datasets"])
+    report["overall"] = _replication_overall(report["datasets"], report["candidate_cross_dataset"])
     return report
 
 

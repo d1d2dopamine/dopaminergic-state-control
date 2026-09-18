@@ -201,6 +201,9 @@ def build_pam04_experiment(
         finding = candidate_by_body.get(body)
         meta = node_meta.get(body, {})
         known_subtype = pam04_subtype(meta.get("hemibrain_type"), meta.get("synonyms"), meta.get("supertype"))
+        is_discovery_candidate = bool(
+            finding and finding.get("status") in {"survived_controls", "survived_thresholds"}
+        )
         cell_records.append({
             "body_id": body,
             "side": _text(row.get("side"), ""),
@@ -213,7 +216,12 @@ def build_pam04_experiment(
                 "dimorphism": _text(meta.get("dimorphism"), ""),
                 "synonyms": _text(meta.get("synonyms"), ""),
             },
-            "candidate": body in candidate_ids,
+            # `candidate` is reserved for a lead that actually survived the
+            # discovery controls. `state_lab_focus` may additionally include
+            # a top cell from each side so the visual sandbox remains usable
+            # even when there is no scientific candidate.
+            "candidate": is_discovery_candidate,
+            "state_lab_focus": body in candidate_ids,
             "candidate_status": finding.get("status") if finding else None,
             "candidate_metric": finding.get("metric") if finding else None,
             "candidate_score": float(finding.get("score", 0.0)) if finding else None,
