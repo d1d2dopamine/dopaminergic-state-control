@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .discovery import discover
 from .experiment_pam04 import build_pam04_experiment
+from .replication import build_pam04_replication
 from .io import load_config, load_snapshot, load_snapshot_meta, write_json
 from .provenance import make_manifest
 from .site import build_site
@@ -64,6 +65,14 @@ def run_pipeline(
         top_channel_members=int(config.get("experiments", {}).get("pam04", {}).get("top_channel_members", 12)),
     )
     write_json(output / "experiment_001_pam04.json", pam04)
+    replication = build_pam04_replication(
+        pam04,
+        cache_dir=output / ".external-cache-placeholder",
+        include_banc=False,
+        include_flywire=False,
+        flywire_connectivity=False,
+    )
+    write_json(output / "experiment_001_replication.json", replication)
     manifest.setdefault("experiments", {})["001_pam04"] = {
         "available": bool(pam04.get("available")),
         "cell_count": int(pam04.get("cell_count", 0) or 0),
@@ -79,6 +88,6 @@ def run_pipeline(
         result.features,
         result.core_ids,
         manifest,
-        experiments={"001_pam04": pam04},
+        experiments={"001_pam04": pam04, "001_pam04_replication": replication},
     )
     return manifest

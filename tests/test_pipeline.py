@@ -10,6 +10,9 @@ def test_pipeline_builds_site(tmp_path: Path):
     assert manifest["snapshot_meta"]["eligible_traced_neurons"] == 42
     assert (out / "findings.json").exists()
     assert (out / "review_queue.json").exists()
+    assert (out / "experiment_001_pam04.json").exists()
+    assert (out / "experiment_001_replication.json").exists()
+    assert (out / "site" / "data" / "experiments" / "001_pam04_replication.json").exists()
     assert (out / "site" / "index.html").exists()
     assert (out / "site" / "network.html").exists()
     assert (out / "site" / "assets" / "brain.js").exists()

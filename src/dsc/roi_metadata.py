@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .anatomy import parse_roi_value, roi_json
+from .anatomy import parse_roi_info, parse_roi_value, roi_json
 
 SERVER = "https://neuprint.janelia.org"
 DATASET = "male-cns:v1.0"
@@ -19,7 +19,7 @@ DATASET = "male-cns:v1.0"
 def _post_cypher(cypher: str, token: str | None = None, timeout: int = 120, retries: int = 3) -> dict:
     payload = json.dumps({"cypher": cypher, "dataset": DATASET}).encode("utf-8")
     headers = {
-        "User-Agent": "dopaminergic-state-control/0.4.0",
+        "User-Agent": "dopaminergic-state-control/0.5.0",
         "Content-Type": "application/json",
     }
     if token:
@@ -45,7 +45,7 @@ def _post_cypher(cypher: str, token: str | None = None, timeout: int = 120, retr
 def _cache_payload(records: dict[int, tuple[str, str]]) -> dict:
     return {
         "dataset": DATASET,
-        "schema": 1,
+        "schema": 2,
         "records": {
             str(int(body)): {"input_rois": values[0], "output_rois": values[1]}
             for body, values in records.items()
@@ -102,13 +102,17 @@ def fetch_roi_metadata(
     if cache and cache.exists():
         try:
             records = _read_cache(cache)
-            if records:
+            nonempty_in = sum(1 for values in records.values() if values[0] != "[]")
+            nonempty_out = sum(1 for values in records.values() if values[1] != "[]")
+            if records and nonempty_in and nonempty_out:
                 return records, {
                     "source": "cache",
                     "cache_path": str(cache),
                     "records": int(len(records)),
+                    "records_with_input_rois": int(nonempty_in),
+                    "records_with_output_rois": int(nonempty_out),
                 }
-            cache_read_error = "cache contained no records"
+            cache_read_error = f"cache had no usable ROI coverage (input={nonempty_in}, output={nonempty_out})"
         except Exception as exc:
             # A truncated Actions cache must not permanently disable the anatomy
             # control. Re-query the pinned neuPrint dataset and replace it.
@@ -124,14 +128,14 @@ def fetch_roi_metadata(
         cypher = f"""
 MATCH (n:Neuron)
 WHERE n.bodyId > {int(last_body)}
-RETURN n.bodyId AS bodyId, n.inputRois AS inputRois, n.outputRois AS outputRois
+RETURN n.bodyId AS bodyId, n.inputRois AS inputRois, n.outputRois AS outputRois, n.roiInfo AS roiInfo
 ORDER BY n.bodyId
 LIMIT {batch_size}
 """.strip()
         response = _post_cypher(cypher, token=token)
         columns = response.get("columns", [])
         index = {name: i for i, name in enumerate(columns)}
-        required = {"bodyId", "inputRois", "outputRois"}
+        required = {"bodyId"}
         if not required.issubset(index):
             raise RuntimeError(f"unexpected neuPrint ROI columns: {columns}")
         rows = response.get("data", [])
@@ -144,8 +148,16 @@ LIMIT {batch_size}
                 body = int(row[index["bodyId"]])
             except (TypeError, ValueError):
                 continue
-            ins = roi_json(parse_roi_value(row[index["inputRois"]]))
-            outs = roi_json(parse_roi_value(row[index["outputRois"]]))
+            ins_values = parse_roi_value(row[index["inputRois"]]) if "inputRois" in index else []
+            out_values = parse_roi_value(row[index["outputRois"]]) if "outputRois" in index else []
+            if (not ins_values or not out_values) and "roiInfo" in index:
+                fallback_in, fallback_out = parse_roi_info(row[index["roiInfo"]])
+                if not ins_values:
+                    ins_values = fallback_in
+                if not out_values:
+                    out_values = fallback_out
+            ins = roi_json(ins_values)
+            outs = roi_json(out_values)
             records[body] = (ins, outs)
             last_body = max(last_body, body)
         batches += 1
@@ -158,12 +170,20 @@ LIMIT {batch_size}
 
     if not records:
         raise RuntimeError("neuPrint ROI query returned no neuron metadata")
+    nonempty_in = sum(1 for values in records.values() if values[0] != "[]")
+    nonempty_out = sum(1 for values in records.values() if values[1] != "[]")
+    if not nonempty_in or not nonempty_out:
+        raise RuntimeError(
+            f"neuPrint ROI query returned no usable ROI coverage (input={nonempty_in}, output={nonempty_out})"
+        )
     if cache:
         _write_cache(cache, records)
     return records, {
         "source": "neuprint",
         "cache_path": str(cache) if cache else None,
         "records": int(len(records)),
+        "records_with_input_rois": int(nonempty_in),
+        "records_with_output_rois": int(nonempty_out),
         "batches": int(batches),
         "replaced_cache_error": cache_read_error,
     }

@@ -46,6 +46,8 @@ def test_state_lab_is_reproducible_and_explicitly_model_based():
     assert 'simulate(p' in js
     assert 'buildEvents' in js
     assert "data/experiments/001_pam04.json" in js
+    assert "001_pam04_replication.json" in js
+    assert "cross-connectome replication" in html
     live3d = Path('site/assets/state-lab-3d.js').read_text(encoding='utf-8')
     assert 'source_skeleton_url_template' in live3d
     assert '001_pam04_synapses.json' in live3d

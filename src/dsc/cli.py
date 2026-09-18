@@ -6,6 +6,7 @@ import json
 from .geometry import build_geometry_manifest
 from .malecns import build_dopamine_snapshot
 from .pipeline import run_pipeline
+from .replication import write_pam04_replication
 from .synapses import build_pam04_synapse_manifest, build_synapse_site_manifest
 from .state_model import run_scenario_file
 
@@ -28,7 +29,8 @@ def main() -> None:
     fetch.add_argument("--snapshot-floor", type=int, default=1, help="Lowest edge weight retained so robustness tests can re-threshold without re-downloading")
     fetch.add_argument("--include-nontraced", action="store_true")
     fetch.add_argument("--refresh", action="store_true")
-    fetch.add_argument("--roi-cache", help="Optional .json.gz cache for compact neuPrint inputRois/outputRois metadata")
+    fetch.add_argument("--roi-cache", help="Optional .json.gz cache for compact neuPrint ROI metadata")
+    fetch.add_argument("--identity-cache", help="Optional .json.gz cache for compact MaleCNS cross-dataset identity metadata")
 
     geometry = sub.add_parser("geometry-manifest", help="Build/vend official MaleCNS shell/ROI geometry and selected skeletons")
     geometry.add_argument("--output", required=True)
@@ -54,6 +56,18 @@ def main() -> None:
     pam_syn.add_argument("--max-partners", type=int, default=10)
     pam_syn.add_argument("--max-points", type=int, default=2500)
 
+
+    repl = sub.add_parser("pam04-replication", help="Falsify/replicate Experiment 001 across BANC v888 and FlyWire v783")
+    repl.add_argument("--experiment", required=True, help="Generated experiment_001_pam04.json")
+    repl.add_argument("--output", required=True, help="Replication JSON output")
+    repl.add_argument("--cache-dir", default="data/cache/replication", help="Cache for external public data files")
+    repl.add_argument("--refresh", action="store_true")
+    repl.add_argument("--skip-banc", action="store_true")
+    repl.add_argument("--skip-flywire", action="store_true")
+    repl.add_argument("--flywire-annotations-only", action="store_true", help="Load FlyWire PAM04 annotations but skip the 852 MB connectivity table")
+    repl.add_argument("--outlier-z", type=float, default=3.5)
+    repl.add_argument("--min-subtype-peers", type=int, default=4)
+
     sim = sub.add_parser("pam04-simulate", help="Reproduce a committed Experiment 001 State Lab scenario")
     sim.add_argument("--experiment", required=True, help="Generated experiment_001_pam04.json")
     sim.add_argument("--scenario", required=True, help="Scenario JSON exported from State Lab or written by hand")
@@ -72,6 +86,7 @@ def main() -> None:
             refresh=args.refresh,
             snapshot_floor=args.snapshot_floor,
             roi_cache=args.roi_cache,
+            identity_cache=args.identity_cache,
         )
         print(json.dumps(lock["selection"], indent=2))
     elif args.command == "geometry-manifest":
@@ -119,6 +134,28 @@ def main() -> None:
             "status": payload.get("status"),
             "candidates": len(payload.get("candidates", {})),
             "total_points": payload.get("total_points", 0),
+        }, indent=2))
+    elif args.command == "pam04-replication":
+        payload = write_pam04_replication(
+            args.experiment,
+            args.output,
+            args.cache_dir,
+            include_banc=not args.skip_banc,
+            include_flywire=not args.skip_flywire,
+            flywire_connectivity=not args.flywire_annotations_only,
+            refresh=args.refresh,
+            outlier_z=args.outlier_z,
+            min_subtype_peers=args.min_subtype_peers,
+        )
+        print(json.dumps({
+            "overall": payload.get("overall", {}),
+            "datasets": {k: {
+                "available": v.get("available"),
+                "connectivity_tested": v.get("connectivity_tested"),
+                "pam04_cells": v.get("pam04_cells"),
+                "motif": v.get("motif"),
+                "error": v.get("error"),
+            } for k, v in payload.get("datasets", {}).items()},
         }, indent=2))
     elif args.command == "pam04-simulate":
         payload = run_scenario_file(args.experiment, args.scenario, args.output)

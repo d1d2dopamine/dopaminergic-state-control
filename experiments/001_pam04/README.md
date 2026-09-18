@@ -2,44 +2,57 @@
 
 ## Question
 
-Does the unusually concentrated input profile observed in a small subset of PAM04 dopaminergic neurons make those cells more selective or influential in a simple connectome-constrained counterfactual model?
+Does an unusually concentrated PAM04 input profile persist after known-subtype conditioning, recur in independent adult connectomes, and only then produce a robust functional difference in a simple connectome-constrained model?
 
-This experiment begins with the MaleCNS structural candidate. It does **not** assume that the candidate is a biological subtype.
+The experiment starts from a MaleCNS structural lead. It does **not** assume the lead is a new subtype.
 
-## Structural comparisons
+## Stage A — MaleCNS subtype resolution
 
-The build generates a dossier for all PAM04 neurons at the configured primary edge threshold. It includes:
+For all PAM04 cells the build stores available cross-dataset identity metadata.
 
-- exact-type distribution of `max_input_share`;
-- strongest individual input/output partners;
-- aggregated upstream and downstream cell-type channels;
-- discovery robustness and bilateral evidence when a PAM04 cell is present in the review queue.
+A `known_subtype` is accepted only when an explicit annotation/matching field contains a label such as `PAM04-*`.
 
-## State Lab
+The established subtype nomenclature is cross-checked against Li et al. (2020), eLife 62576, Supplementary file 1 (`10.7554/eLife.62576`). The supplement is provenance only in v0.5; the pipeline does not infer a subtype from our discovery metric.
 
-The static research site contains an interactive browser-only sandbox. v0.4.2 presents it as a live 3D playback: official MaleCNS skeletons brighten with normalized model activity, deterministic pulse markers move over the real geometry, best-effort real candidate synapse sites flash, and a synchronized simulated-event raster/activity trace shows the same timeline. These event ticks are derived from the rate model and are not recorded spikes.
+For subtype groups with at least four cells, `max_input_share` is re-tested within the subtype. This separates:
 
-The lab compares the real structural profile against counterfactuals using identical model parameters:
+- an outlier that persists inside a known subtype;
+- a global PAM04 outlier explained by established subtype structure;
+- unresolved/too-small cases.
 
-- `real` — measured connectome weights;
-- `knockout` — selected candidate PAM04 activity is forced to zero;
-- `medianize` — selected candidate input-channel profile is replaced by the PAM04 median profile while preserving its total input weight;
-- `amplify` — the selected candidate's strongest input channel is multiplied by a user-controlled factor;
-- `shuffle` — selected candidate input-channel weights are deterministically permuted while preserving the same values.
+## Stage B — independent structural replication
 
-The dynamic layer is deliberately phenomenological. It is useful for asking whether a structural feature *could matter in the model*, not for claiming measured firing rates or behavior.
+`dsc pam04-replication` applies the same high-input-concentration logic to:
 
-## Dopamine receptor sandbox
+- BANC v888 strict-proofread PAM04 neurons;
+- FlyWire v783 PAM04 neurons.
 
-The viewer exposes normalized `Dop1R1`, `Dop1R2`, and `Dop2R` response channels plus DAT clearance. These are exploratory model parameters. MaleCNS does not provide per-target receptor abundance, so the project must not present these traces as measured receptor activity in a particular postsynaptic neuron.
+The test looks for within-known-subtype outliers and bilateral recurrence. It does not require matching root IDs across specimens.
 
-The D1-like versus D2-like coupling sign is treated only as a receptor-family prior. Every exported run records the exact user parameters and assumptions.
+A positive result is structural replication only. Different connectomes use different specimens and reconstruction/synapse pipelines.
+
+## Stage C — State Lab
+
+Only after the structural candidate is worth retaining do we interpret the live counterfactual model.
+
+Available interventions:
+
+- `real`;
+- `knockout`;
+- `medianize`;
+- `amplify`;
+- deterministic `shuffle`.
+
+The live 3D view uses official MaleCNS skeletons and best-effort real synapse coordinates. Glow, pulse travel, event raster and receptor dynamics are simulated and are not physiological recordings.
 
 ## Falsification path
 
-A PAM04 candidate becomes less interesting if:
+PAM04 is demoted/closed if:
 
-1. the effect disappears under reasonable edge thresholds;
-2. medianizing the candidate's unusual input structure has negligible output consequences across parameter sweeps;
-3. the apparent specialization is driven by a single reconstruction/annotation artifact;
-4. the pattern fails independent connectome replication when comparable data are available.
+1. the MaleCNS effect disappears under reasonable edge thresholds;
+2. known-subtype conditioning explains the candidate;
+3. the external connectomes do not reproduce a comparable structural motif;
+4. the apparent effect is reconstruction/annotation driven;
+5. model consequences vanish under reasonable parameter sweeps.
+
+A negative result is recorded rather than rescued post hoc. The same replication framework can then be applied to PAM05/PAM13.

@@ -138,7 +138,7 @@ table.compact th,table.compact td { padding: 4px 6px; }
   .lab-actions { justify-content: flex-start; margin-top: 8px; }
 }
 
-/* v0.4.2 live State Lab */
+/* v0.5.0 live State Lab */
 .lab-grid-live { grid-template-columns: 292px minmax(0,1fr); min-height: 900px; }
 .lab-live-workspace { padding: 0; background: #0d0e10; }
 .lab-live-panel { position: relative; height: min(68vh,760px); min-height: 520px; background: #090a0c; border-bottom: 1px solid var(--line); overflow: hidden; }

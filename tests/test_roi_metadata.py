@@ -81,3 +81,33 @@ def test_hydrate_roi_metadata_skips_network_when_flat_coverage_is_sufficient(mon
     assert meta["source"] == "flat_annotations"
     assert meta["hydrated"] is False
     assert unchanged.equals(frame)
+
+
+def test_fetch_roi_metadata_falls_back_to_roi_info(tmp_path, monkeypatch):
+    responses = [{
+        "columns": ["bodyId", "inputRois", "outputRois", "roiInfo"],
+        "data": [
+            [1, [], [], {"SMP": {"pre": 4, "post": 2}, "MB": {"pre": 0, "post": 3}}],
+            [2, None, None, {"SLP": {"pre": 5, "post": 0}, "SMP": {"pre": 0, "post": 2}}],
+        ],
+    }]
+    monkeypatch.setattr(rm, "_post_cypher", lambda *a, **k: responses.pop(0))
+    records, meta = rm.fetch_roi_metadata(tmp_path / "roi-v2.json.gz", batch_size=100)
+    assert records[1] == ('["MB","SMP"]', '["SMP"]')
+    assert records[2] == ('["SMP"]', '["SLP"]')
+    assert meta["records_with_input_rois"] == 2
+    assert meta["records_with_output_rois"] == 2
+
+
+def test_empty_legacy_roi_cache_is_replaced(tmp_path, monkeypatch):
+    cache = tmp_path / "roi.json.gz"
+    payload = {"dataset": rm.DATASET, "schema": 1, "records": {"1": {"input_rois": "[]", "output_rois": "[]"}}}
+    with gzip.open(cache, "wb") as stream:
+        stream.write(json.dumps(payload).encode("utf-8"))
+    monkeypatch.setattr(rm, "_post_cypher", lambda *a, **k: {
+        "columns": ["bodyId", "inputRois", "outputRois", "roiInfo"],
+        "data": [[1, [], [], {"SMP": {"pre": 1, "post": 1}}]],
+    })
+    records, meta = rm.fetch_roi_metadata(cache, batch_size=100)
+    assert records[1] == ('["SMP"]', '["SMP"]')
+    assert "no usable ROI coverage" in (meta.get("replaced_cache_error") or "")

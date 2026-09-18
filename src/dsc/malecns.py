@@ -16,6 +16,7 @@ import pyarrow.feather as feather
 import pyarrow.ipc as ipc
 
 from .anatomy import anatomical_pool_columns, parse_roi_info, parse_roi_value, roi_json
+from .identity_metadata import hydrate_identity_metadata
 from .roi_metadata import hydrate_roi_metadata
 
 BASE = "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome"
@@ -30,7 +31,7 @@ DEFAULT_CONTROL_THRESHOLDS = (1, 3, 5, 10)
 def _download(url: str, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     temp = destination.with_suffix(destination.suffix + ".part")
-    req = urllib.request.Request(url, headers={"User-Agent": "dopaminergic-state-control/0.4"})
+    req = urllib.request.Request(url, headers={"User-Agent": "dopaminergic-state-control/0.5"})
     with urllib.request.urlopen(req, timeout=120) as src, temp.open("wb") as dst:
         shutil.copyfileobj(src, dst, length=1024 * 1024)
     temp.replace(destination)
@@ -116,6 +117,12 @@ def _read_annotations(path: Path) -> pd.DataFrame:
         "superclass": _optional_column(df, ["superclass"]),
         "class": _optional_column(df, ["class"]),
         "subclass": _optional_column(df, ["subclass"]),
+        "flywire_type": _optional_column(df, ["flywireType", "flywire_type"], default=""),
+        "hemibrain_type": _optional_column(df, ["hemibrainType", "hemibrain_type"], default=""),
+        "supertype": _optional_column(df, ["supertype"], default=""),
+        "hemilineage": _optional_column(df, ["itoleeHl", "itoLeeHl", "hemilineage"], default=""),
+        "dimorphism": _optional_column(df, ["dimorphism"], default=""),
+        "synonyms": _optional_column(df, ["synonyms"], default=""),
         "input_rois": input_rois,
         "output_rois": output_rois,
     })
@@ -162,6 +169,7 @@ def build_dopamine_snapshot(
     snapshot_floor: int = 1,
     control_thresholds: Iterable[int] = DEFAULT_CONTROL_THRESHOLDS,
     roi_cache: str | Path | None = None,
+    identity_cache: str | Path | None = None,
 ) -> dict:
     paths = ensure_sources(raw_dir, refresh=refresh)
     annotations = _read_annotations(paths["annotations"])
@@ -173,6 +181,7 @@ def build_dopamine_snapshot(
     traced_mask = merged["status"].astype(str).str.lower().eq("traced")
     eligible_ids = set(merged.loc[traced_mask, "body_id"].astype(int)) if traced_only else set(merged["body_id"].astype(int))
     merged, roi_metadata_meta = hydrate_roi_metadata(merged, eligible_ids, cache_path=roi_cache)
+    merged, identity_metadata_meta = hydrate_identity_metadata(merged, cache_path=identity_cache)
     dopamine_mask = merged["nt"].astype(str).str.lower().str.strip().isin(["dopamine", "da"])
     if traced_only:
         dopamine_mask &= traced_mask
@@ -236,6 +245,7 @@ def build_dopamine_snapshot(
         nodes = pd.concat([nodes, pd.DataFrame({
             "body_id": missing, "type": "unknown", "side": "unknown", "status": "unknown",
             "superclass": "unknown", "class": "unknown", "subclass": "unknown",
+            "flywire_type": "", "hemibrain_type": "", "supertype": "", "hemilineage": "", "dimorphism": "", "synonyms": "",
             "input_rois": "[]", "output_rois": "[]",
             "nt": "unknown", "nt_confidence": 0.0, "predicted_nt": "unknown", "celltype_predicted_nt": "unknown",
         })], ignore_index=True)
@@ -257,6 +267,7 @@ def build_dopamine_snapshot(
     out.mkdir(parents=True, exist_ok=True)
     node_cols = [
         "body_id", "type", "side", "status", "superclass", "class", "subclass",
+        "flywire_type", "hemibrain_type", "supertype", "hemilineage", "dimorphism", "synonyms",
         "input_rois", "output_rois", "input_roi_count", "anatomical_pool_size", "anatomical_dopamine_pool_size",
         "nt", "nt_confidence", "predicted_nt", "celltype_predicted_nt",
         "full_in_partner_count", "full_in_strength",
@@ -282,6 +293,7 @@ def build_dopamine_snapshot(
             "roi_metadata": roi_metadata_meta,
             **anatomical_meta,
         },
+        "identity_metadata": identity_metadata_meta,
     }
     (out / "snapshot_meta.json").write_text(json.dumps(snapshot_meta, indent=2), encoding="utf-8")
 
@@ -308,6 +320,7 @@ def build_dopamine_snapshot(
             "anatomical_targets_available": anatomical_meta["snapshot_targets_with_anatomical_pool"],
             "roi_metadata_source": roi_metadata_meta.get("source"),
             "roi_metadata_output_coverage": roi_metadata_meta.get("after", {}).get("output_fraction", 0.0),
+            "identity_metadata_source": identity_metadata_meta.get("source"),
         },
     }
     (out / "source.lock.json").write_text(json.dumps(lock, indent=2), encoding="utf-8")

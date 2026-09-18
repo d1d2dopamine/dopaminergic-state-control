@@ -33,7 +33,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/male-cns-v1.0-roi-meta
-          key: male-cns-v1.0-roi-meta-v1
+          key: male-cns-v1.0-roi-meta-v2
+      - name: Cache compact MaleCNS cross-dataset identity metadata
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/male-cns-v1.0-identity-meta
+          key: male-cns-v1.0-identity-meta-v1
+      - name: Cache PAM04 external replication sources
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pam04-replication-sources
+          key: pam04-replication-banc888-flywire783-v1
       - name: Build bounded dopamine snapshot + full-degree controls
         run: |
           dsc fetch-malecns \
@@ -41,9 +51,17 @@ jobs:
             --output build/male-cns-v1.0-dopamine \
             --min-synapses "${{ inputs.min_synapses }}" \
             --snapshot-floor 1 \
-            --roi-cache "${{ runner.temp }}/male-cns-v1.0-roi-meta/roi-availability.json.gz"
+            --roi-cache "${{ runner.temp }}/male-cns-v1.0-roi-meta/roi-availability.json.gz" \
+            --identity-cache "${{ runner.temp }}/male-cns-v1.0-identity-meta/identity.json.gz"
       - name: Run peer-aware discovery and null tests
         run: dsc run --snapshot build/male-cns-v1.0-dopamine --config configs/discovery.yml --output build/research --site-template site --min-synapses "${{ inputs.min_synapses }}"
+      - name: Replicate Experiment 001 across BANC v888 and FlyWire v783
+        run: |
+          dsc pam04-replication \
+            --experiment build/research/experiment_001_pam04.json \
+            --output build/research/experiment_001_replication.json \
+            --cache-dir "${{ runner.temp }}/pam04-replication-sources"
+          cp build/research/experiment_001_replication.json build/research/site/data/experiments/001_pam04_replication.json
       - name: Reproduce committed Experiment 001 State Lab scenarios
         shell: bash
         run: |
@@ -122,6 +140,10 @@ jobs:
               pam04_syn = json.load(open('build/research/site/data/experiments/001_pam04_synapses.json', encoding='utf-8'))
           except FileNotFoundError:
               pam04_syn = {'total_points': 0}
+          try:
+              replication = json.load(open('build/research/experiment_001_replication.json', encoding='utf-8'))
+          except FileNotFoundError:
+              replication = {'overall': {'status': 'not_built'}, 'datasets': {}}
           statuses = Counter(f.get('status', 'candidate') for f in findings)
           kinds = Counter(f.get('kind', 'unknown') for f in findings)
           queue = [f for f in findings if f.get('status') in {'survived_controls', 'survived_thresholds'}]
@@ -129,7 +151,7 @@ jobs:
           roi_meta = anatomical.get('roi_metadata', {})
           roi_after = roi_meta.get('after', {})
           lines = [
-              '# Dopaminergic State Control v0.4.2',
+              '# Dopaminergic State Control v0.5.0',
               '',
               f"- dopamine core: {manifest['counts'].get('dopamine_core_nodes', '—')}",
               f"- findings shown: {len(findings)}",
@@ -141,6 +163,9 @@ jobs:
               f"- Experiment 001 PAM04: {'ready' if pam04.get('available') else 'unavailable'}",
               f"- PAM04 candidates: {', '.join(str(x) for x in pam04.get('candidate_ids', [])) or 'none'}",
               f"- PAM04 live synapse sites: {pam04_syn.get('total_points', 0)}",
+              f"- PAM04 replication status: {replication.get('overall', {}).get('status', 'unknown')}",
+              f"- BANC PAM04 tested: {replication.get('datasets', {}).get('banc', {}).get('connectivity_tested', False)}",
+              f"- FlyWire PAM04 tested: {replication.get('datasets', {}).get('flywire', {}).get('connectivity_tested', False)}",
               '',
               '## Control states',
           ]

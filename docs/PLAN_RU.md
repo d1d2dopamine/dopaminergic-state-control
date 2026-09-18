@@ -1,69 +1,94 @@
-# План исследования — v0.4
+# План исследования — v0.5
 
-## Что изменилось
+## Главная смена направления
 
-Мы больше не хотим страницу из пятидесяти «странностей». Задача v0.4 — пытаться уничтожить каждый кандидат простыми объяснениями до того, как мы вообще начнём им интересоваться.
+UI на этом этапе замораживаем. Следующая задача — не делать симулятор красивее, а попытаться **уничтожить гипотезу PAM04**.
 
-Код теперь спрашивает не только «это большое число?», а:
+Наш текущий MaleCNS lead: несколько PAM04 имеют необычно концентрированный вход. Но для PAM04 уже известна внутренняя типизация, поэтому простая фраза «PAM04 неоднородны» не является новой.
 
-- сохраняется ли эффект при пороге связей 1 / 3 / 5 / 10;
-- сравнивается ли нейрон именно со своим exact type;
-- есть ли похожая аномалия на противоположной стороне;
-- не тянет ли результат одна огромная связь;
-- для dopamine convergence: могли ли потенциальные presynaptic клетки вообще попадать в те же ROI, куда target получает входы;
-- если есть реальные synapse coordinates: занимают ли разные dopamine sources отдельные территории на target.
+Вопрос v0.5:
 
-## ROI-availability null
+> остаётся ли аномалия `max_input_share` внутри явно аннотированного PAM04-подтипа и повторяется ли похожий структурный motif в независимых connectomes?
 
-Для target берём его `inputRois`. Для каждого traced source смотрим `outputRois`. Source попадает в допустимый pool, если есть хотя бы одно пересечение.
+## Шаг 1 — known-subtype check
 
-После этого спрашиваем: при фиксированном полном in-degree target насколько необычно получить наблюдаемое число dopamine sources из этого анатомически доступного pool?
+Для каждой MaleCNS PAM04 pipeline подтягивает доступные identity-поля из `male-cns:v1.0` neuPrint:
 
-Это лучше глобального перемешивания всего CNS, но это ещё не геометрический contact model. Два нейрона могут иметь общий ROI и всё равно физически не встречаться.
+- FlyWire type;
+- Hemibrain type;
+- supertype;
+- hemilineage;
+- dimorphism;
+- synonyms.
 
-Если ROI данных не хватает в flat annotations, CI пытается получить только компактные `bodyId/inputRois/outputRois` из закреплённого `male-cns:v1.0` neuPrint и кэширует ответ. Если и это недоступно, карточка не притворяется anatomy-controlled: она получает статус `global_only`, а источник/coverage ROI остаётся в `snapshot_meta.json` и Actions summary.
+Подтип считается известным только если в annotation/match поле явно присутствует имя вида `PAM04-*`. Код не кластеризует клетки и не придумывает subtype из той же метрики, которую потом тестирует.
 
-## Статусы findings
+Если у подтипа минимум 4 клетки, `max_input_share` пересчитывается внутри этого подтипа.
 
-- `survived_controls` — direct dopamine-input candidate прошёл ROI null и устойчивость по thresholds;
-- `survived_thresholds` — exact-type outlier устойчив по thresholds, но это не causal result;
-- `threshold_sensitive` — результат сильно зависит от cutoff;
-- `global_only` — для convergence доступен только старый global degree null;
-- `candidate` — отдельный detector дал lead, но полного набора v0.4 controls для него нет.
+Интерпретация:
 
-`review_queue.json` содержит только первые две категории. Именно с неё стоит начинать ручной разбор.
+- `persists_within_known_subtype` — кандидат остаётся сильным outlier внутри известного subtype;
+- `compatible_with_known_subtype_structure` — глобальная «аномалия» объясняется известной subtype-структурой;
+- `subtype_too_small` — мало peers;
+- `known_subtype_unresolved` — нет явной subtype annotation.
 
-## Spatial synapse evidence
+## Шаг 2 — BANC v888
 
-Для direct dopamine-input findings CI получает реальные pre/post synapse positions из MaleCNS neuPrint. Для queried dopamine sources считается доля пространственной вариации post-sites, объясняемая source identity (`eta²`). Source labels переставляются permutation test'ом, затем p-values корректируются BH.
+В BANC берём только строго proofread PAM04 для connectivity-sensitive теста.
 
-Высокое значимое eta² значит: разные dopamine sources занимают различимые территории на target среди **запрошенных dopamine inputs**. Это не тест «dopamine clustered against all other transmitters».
+Для каждой клетки считаем при connection threshold `count >= 5`:
 
-## Что после первого реального v0.4 run
+- total incoming weight;
+- число presynaptic partners;
+- долю самого сильного входа;
+- global robust-z;
+- within-known-subtype robust-z, если subtype достаточно большой;
+- наличие outlier слева и справа.
 
-1. Берём `review_queue.json`.
-2. Проверяем самые устойчивые 3–10 кандидатов на reconstruction/annotation артефакты.
-3. Для оставшихся делаем глубокий literature/preprint novelty search.
-4. Только после этого выбираем `Experiment 001` и начинаем связывать конкретный circuit mechanism с D1/D2/DAT/internal-state literature.
+Это structural replication. Мы не требуем одинаковых root IDs между мухами.
 
-## Experiment 001 — PAM04
+## Шаг 3 — FlyWire v783
 
-Первый focused experiment проверяет, имеет ли необычно концентрированный вход части PAM04 функциональное значение хотя бы в простой connectome-constrained модели.
+Тот же тест проводится на FlyWire PAM04.
 
-Порядок проверки:
+FlyWire connectivity хранит pair-neuropil rows, поэтому pipeline сначала агрегирует их до neuron-to-neuron pair, затем применяет threshold 5. Это делает метрику сопоставимой по смыслу с BANC/MaleCNS, хотя сами datasets и synapse detectors различаются.
 
-1. exact-type структурный кандидат и robustness thresholds;
-2. bilateral evidence;
-3. реальные upstream/downstream partners;
-4. counterfactual `knockout / medianize / amplify / shuffle`;
-5. parameter sweeps в State Lab;
-6. только после устойчивого model effect — независимая replication / литература / более биофизическая модель.
+## Шаг 4 — правило решения
 
-State Lab не превращает модельный результат в биологический вывод. Его задача — быстро находить counterfactuals, которые стоит проверять дальше.
+`experiment_001_replication.json` показывает отдельно MaleCNS / BANC / FlyWire.
 
+Мы не объявляем «репликацию» только потому, что где-то есть большой z-score. Смотрим:
 
-## Live State Lab v0.4.2
+1. разрешён ли известный subtype;
+2. есть ли within-subtype outlier;
+3. повторяется ли motif на обеих сторонах внутри external dataset;
+4. повторяется ли он в одном или обоих независимых connectomes.
 
-Чтобы проверка не сводилась к чтению таблиц, Experiment 001 теперь воспроизводится как синхронный визуальный playback. Анатомия и точки синапсов остаются реальными MaleCNS данными; яркость нейронов, движущиеся импульсы, event raster и задержки — только визуализация текущей rate-модели.
+Возможные исходы:
 
-Во время одного запуска нужно глазами сравнивать одинаковый stimulus в `real` и контрфактуальном режиме. Если эффект виден только в красивой анимации, но исчезает по численным trace/summary, это не считается подтверждением. И наоборот, визуал нужен, чтобы быстро понять *где* в реальной геометрии возникает различие и какую следующую проверку имеет смысл поставить.
+- pattern объясняется known subtype → PAM04 становится validation case для detector;
+- pattern есть только в MaleCNS → вероятная individual/connectome variation, PAM04 закрываем;
+- pattern есть в одном внешнем connectome → продолжаем осторожно;
+- pattern появляется в обоих внешних connectomes → делаем synapse-level spatial comparison и только потом усиливаем mechanistic simulation.
+
+## ROI-анатомический null
+
+v0.5 также чинит старую проблему 0% ROI coverage.
+
+Если `inputRois/outputRois` пустые, compact neuPrint fetch теперь получает `roiInfo` и извлекает:
+
+- input ROI, если `post > 0`;
+- output ROI, если `pre > 0`.
+
+Старый пустой cache считается непригодным и автоматически заменяется. Если и новый запрос не даёт usable coverage, convergence остаётся `global_only`.
+
+## Что делаем после зелёного v0.5 heavy run
+
+1. Смотрим `Experiment 001 → replication`.
+2. Проверяем, получили ли 158196 и 186566 явные known subtypes.
+3. Смотрим within-subtype z, а не только глобальный PAM04 z.
+4. Сравниваем BANC и FlyWire.
+5. Только если PAM04 пережил эти проверки, строим spatial/synapse consensus и parameter sweeps State Lab.
+6. Если не пережил — не спасаем гипотезу, а переходим к PAM05/PAM13 тем же pipeline.
+
+Live State Lab остаётся инструментом понимания и counterfactual-моделирования, а не доказательством физиологии.

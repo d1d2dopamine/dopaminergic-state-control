@@ -20,7 +20,7 @@ DATASET = "male-cns:v1.0"
 def _post_cypher(cypher: str, token: str | None = None, timeout: int = 120, retries: int = 3) -> dict:
     payload = json.dumps({"cypher": cypher, "dataset": DATASET}).encode("utf-8")
     headers = {
-        "User-Agent": "dopaminergic-state-control/0.4.2",
+        "User-Agent": "dopaminergic-state-control/0.5.0",
         "Content-Type": "application/json",
     }
     if token:

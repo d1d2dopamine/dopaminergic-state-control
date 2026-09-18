@@ -1,27 +1,37 @@
-# Первый запуск v0.4.2
+# Первый запуск v0.5.0
 
 После commit/push обычный `CI` должен стать зелёным.
 
 Затем:
 
 1. **Actions → Update MaleCNS dopamine snapshot**.
-2. `min_synapses` оставь `3`, если мы специально не проверяем другой primary cutoff.
+2. `min_synapses` оставь `3`.
 3. Запусти workflow.
-4. В summary самого GitHub Action появятся counts по control statuses и первые элементы manual investigation queue.
-5. На Pages открой `findings` и сначала фильтруй по `survived controls` / `survived thresholds`.
+4. Первый v0.5 heavy-run может быть заметно дольше прошлых: он впервые кэширует BANC v888 и FlyWire v783 источники для replication.
+5. В Actions summary появятся обычные discovery counts и отдельный `PAM04 replication` status.
+6. На Pages открой `state lab` и секцию **cross-connectome replication**.
 
-Внутренне workflow теперь хранит one-hop edges начиная с weight 1. Это не означает, что основной анализ стал использовать threshold 1: primary cutoff по-прежнему 3. Низкий floor нужен, чтобы тот же run мог проверить 1/3/5/10 без повторного скачивания connectome.
+## Что смотреть первым
 
-Если ROI metadata доступны, dopamine-input findings используют ROI-overlap availability null. Если нет — соответствующая карточка будет `global_only`, а не замаскирована под anatomy-controlled result.
+Не начинай с симуляции. Сначала проверь:
 
-3D остался инструментом проверки: серый прозрачный brain shell, реальные skeletons и, где применимо, реальные synapse sites.
+- получил ли MaleCNS candidate `known subtype`;
+- `known subtype check` для 158196 и 186566;
+- сколько PAM04/subtype cells нашлось в BANC;
+- сколько PAM04/subtype cells нашлось в FlyWire;
+- есть ли `within-subtype` outliers и bilateral motif;
+- какой итоговый replication status.
 
-## Experiment 001 / State Lab
+Если subtype не разрешился, это честно помечается как unresolved. Если внешний источник не скачался/не прочитался, workflow должен сохранить fail-soft status, а не придумать результат.
 
-Начиная с v0.4.2 реальный heavy-run автоматически строит `Experiment 001 — PAM04 input specialization`.
+## ROI fix
 
-После зелёной сборки открой `state lab` на GitHub Pages. Главный экран теперь — живой 3D playback: реальные MaleCNS skeletons светятся по модельной активности, по ним идут simulated pulse markers, реальные synapse sites вспыхивают, а ниже синхронно двигаются raster событий, activity trace и mini circuit. Можно выбрать PAM04-кандидата, upstream cell-type channel и сравнить исходную структуру с `knockout`, `medianize`, `amplify` или детерминированным `shuffle`.
+Cache key ROI изменён, поэтому первый v0.5 run заново запросит compact MaleCNS ROI metadata. Теперь запрос включает `roiInfo`.
 
-Ползунки `dopamine tone`, `DAT clearance`, `Dop1R1`, `Dop1R2`, `Dop2R` относятся к модельному слою, а не к измеренным значениям конкретных клеток. Это специально подписано на сайте.
+В summary проверь `ROI output coverage` и `targets with anatomical pool`. Если coverage снова 0%, dopamine-convergence часть всё ещё надо считать `global_only`; PAM04 exact-type/subtype тест от этого отдельно не ломается.
 
-Если комбинация параметров выглядит интересной, нажми **export run JSON** и положи файл в `experiments/001_pam04/scenarios/`. Следующий `Update MaleCNS dopamine snapshot` воспроизведёт этот JSON уже в Python/CI и положит результат в research artifact и на сайт в список committed CI scenarios.
+## State Lab
+
+Live 3D State Lab остаётся: реальные skeletons/synapse coordinates плюс simulated glow/pulses/events.
+
+После structural replication можно снова использовать `real / knockout / medianize / amplify / shuffle` и сохранять интересные run JSON. Но parameter sandbox идёт **после** subtype/cross-connectome проверки, а не вместо неё.

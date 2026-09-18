@@ -26,7 +26,7 @@ function findingRows(findings,synapses=null){
   return `<table><thead><tr><th>rank</th><th>control</th><th>robust</th><th>null</th><th>method</th><th>candidate</th><th>focus</th><th>spatial</th><th></th></tr></thead><tbody>${findings.map(f=>`<tr data-kind="${esc(f.kind)}" data-status="${esc(f.status||'candidate')}" data-search="${esc((f.title+' '+f.summary+' '+f.focus_node+' '+(f.status||'')).toLowerCase())}"><td>${esc(f.review_rank??f.method_rank??'—')}</td><td>${esc((f.status||'candidate').replaceAll('_',' '))}</td><td>${esc(robustnessLabel(f))}</td><td>${esc(nullLabel(f))}</td><td>${esc(f.kind.replaceAll('_',' '))}</td><td>${esc(f.summary)}</td><td>${esc(f.focus_node)}</td><td>${esc(spatialLabel(f,synapses))}</td><td><a href="network.html?finding=${encodeURIComponent(f.id)}">3d</a></td></tr>`).join('')}</tbody></table>`;
 }
 async function overview(){
-  const [findings, reviewQueue, run, synapses, pam04] = await Promise.all([getJSON('data/findings.json'), getJSONOptional('data/review_queue.json'), getJSON('data/run.json'), getJSONOptional('data/synapses.json'), getJSONOptional('data/experiments/001_pam04.json')]);
+  const [findings, reviewQueue, run, synapses, pam04, replication] = await Promise.all([getJSON('data/findings.json'), getJSONOptional('data/review_queue.json'), getJSON('data/run.json'), getJSONOptional('data/synapses.json'), getJSONOptional('data/experiments/001_pam04.json'), getJSONOptional('data/experiments/001_pam04_replication.json')]);
   const counts=run.counts||{};
   const s = [
     ['dataset',run.dataset],['dopamine core',counts.dopamine_core_nodes??'—'],['snapshot nodes',counts.snapshot_nodes??'—'],['snapshot edges',counts.snapshot_edges??'—'],['manual investigation queue',counts.review_queue??'—']
@@ -36,8 +36,12 @@ async function overview(){
   const displayed=review.length?review.slice(0,12):findings.slice(0,12);
   document.querySelector('#top-table').innerHTML=findingRows(displayed,synapses);
   const m=run.snapshot_meta||{},a=m.anatomical_null||{},roi=a.roi_metadata||{},coverage=roi.after?.output_fraction;
-  const exp=document.querySelector('#experiment-note');if(exp)exp.innerHTML=pam04?.available?`PAM04 dossier ready: ${esc(pam04.cell_count)} cells; candidates ${esc((pam04.candidate_ids||[]).join(', ')||'none')}. <a href="state-lab.html">open State Lab</a>`:'PAM04 State Lab is unavailable in this snapshot.';
-  document.querySelector('#method-note').textContent=`v0.4.2 ${review.length?'manual investigation queue':'no threshold-surviving manual candidates; showing highest raw leads'}; primary threshold ${run.effective_analysis?.min_synapses??'—'}; ROI metadata ${roi.source??'unknown'}${Number.isFinite(Number(coverage))?` (${(Number(coverage)*100).toFixed(1)}% output coverage)`:''}; anatomical pools ${a.snapshot_targets_with_anatomical_pool??0}/${a.snapshot_nodes??0}; robustness thresholds ${(run.effective_analysis?.robustness_thresholds||[]).join(', ')}.`;
+  const exp=document.querySelector('#experiment-note');
+  if(exp){
+    const rep=replication?.overall?.status ? `; replication ${esc(replication.overall.status.replaceAll('_',' '))}` : '';
+    exp.innerHTML=pam04?.available?`PAM04 dossier ready: ${esc(pam04.cell_count)} cells; candidates ${esc((pam04.candidate_ids||[]).join(', ')||'none')}${rep}. <a href="state-lab.html">open State Lab</a>`:'PAM04 State Lab is unavailable in this snapshot.';
+  }
+  document.querySelector('#method-note').textContent=`v0.5.0 ${review.length?'manual investigation queue':'no threshold-surviving manual candidates; showing highest raw leads'}; primary threshold ${run.effective_analysis?.min_synapses??'—'}; ROI metadata ${roi.source??'unknown'}${Number.isFinite(Number(coverage))?` (${(Number(coverage)*100).toFixed(1)}% output coverage)`:''}; anatomical pools ${a.snapshot_targets_with_anatomical_pool??0}/${a.snapshot_nodes??0}; robustness thresholds ${(run.effective_analysis?.robustness_thresholds||[]).join(', ')}.`;
 }
 async function findingsPage(){
   const [findings,synapses]=await Promise.all([getJSON('data/findings.json'),getJSONOptional('data/synapses.json')]);

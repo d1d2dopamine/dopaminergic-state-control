@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .features import robust_zscores
+from .subtypes import pam04_subtype
 
 
 DEFAULT_MODEL = {
@@ -198,9 +199,20 @@ def build_pam04_experiment(
         inc_total = int(inc["weight"].sum())
         out_total = int(out["weight"].sum())
         finding = candidate_by_body.get(body)
+        meta = node_meta.get(body, {})
+        known_subtype = pam04_subtype(meta.get("hemibrain_type"), meta.get("synonyms"), meta.get("supertype"))
         cell_records.append({
             "body_id": body,
             "side": _text(row.get("side"), ""),
+            "known_subtype": known_subtype,
+            "cross_dataset_identity": {
+                "flywire_type": _text(meta.get("flywire_type"), ""),
+                "hemibrain_type": _text(meta.get("hemibrain_type"), ""),
+                "supertype": _text(meta.get("supertype"), ""),
+                "hemilineage": _text(meta.get("hemilineage"), ""),
+                "dimorphism": _text(meta.get("dimorphism"), ""),
+                "synonyms": _text(meta.get("synonyms"), ""),
+            },
             "candidate": body in candidate_ids,
             "candidate_status": finding.get("status") if finding else None,
             "candidate_metric": finding.get("metric") if finding else None,
@@ -227,6 +239,49 @@ def build_pam04_experiment(
                 for r in out.head(int(top_partners_per_cell)).itertuples(index=False)
             ],
         })
+
+    # Re-test the discovery metric inside any explicitly annotated legacy PAM04
+    # subtype. This is the first falsification step: an exact-type outlier can be
+    # explained by known subtype structure rather than a new within-subtype motif.
+    subtype_rows = []
+    subtype_groups: dict[str, list[dict]] = defaultdict(list)
+    for cell in cell_records:
+        if cell.get("known_subtype"):
+            subtype_groups[str(cell["known_subtype"])].append(cell)
+    for subtype, group in sorted(subtype_groups.items()):
+        vals = pd.Series([float(c["metrics"]["max_input_share"]) for c in group], dtype=float)
+        zs = robust_zscores(vals) if len(group) >= 4 else np.full(len(group), np.nan)
+        for cell, z in zip(group, zs):
+            cell["within_subtype_max_input_share_z"] = None if not np.isfinite(z) else float(z)
+            if cell.get("candidate"):
+                if len(group) < 4:
+                    explanation = "subtype_too_small"
+                elif abs(float(z)) >= 3.5:
+                    explanation = "persists_within_known_subtype"
+                else:
+                    explanation = "compatible_with_known_subtype_structure"
+                cell["subtype_resolution"] = {
+                    "status": explanation,
+                    "subtype": subtype,
+                    "peer_n": len(group),
+                    "within_subtype_robust_z": None if not np.isfinite(z) else float(z),
+                }
+        subtype_rows.append({
+            "subtype": subtype,
+            "n": len(group),
+            "left": sum(str(c.get("side", "")).upper() == "L" for c in group),
+            "right": sum(str(c.get("side", "")).upper() == "R" for c in group),
+            "median_max_input_share": float(vals.median()),
+            "tested_within_subtype": len(group) >= 4,
+        })
+    for cell in cell_records:
+        if cell.get("candidate") and not cell.get("known_subtype"):
+            cell["subtype_resolution"] = {
+                "status": "known_subtype_unresolved",
+                "subtype": None,
+                "peer_n": 0,
+                "within_subtype_robust_z": None,
+            }
 
     def input_members(name: str) -> list[dict]:
         if name == "other":
@@ -307,6 +362,7 @@ def build_pam04_experiment(
         "left_count": int((pam["side"].astype(str).str.upper() == "L").sum()),
         "right_count": int((pam["side"].astype(str).str.upper() == "R").sum()),
         "candidate_ids": [int(x) for x in candidate_ids],
+        "known_subtypes": subtype_rows,
         "cells": cell_records,
         "input_channels": input_channels,
         "output_channels": output_channels,
@@ -318,6 +374,7 @@ def build_pam04_experiment(
             "Dopamine concentration, DAT clearance and receptor activation use normalized units.",
             "Dop1R1/Dop1R2/Dop2R are not assigned to individual downstream cells here because cell-specific receptor abundance is not present in the MaleCNS connectome snapshot.",
             "A simulated effect is a model sensitivity result, not evidence that the same effect occurs in a living fly.",
+            "Legacy PAM04 subtype labels are taken only from cross-dataset/hemibrain annotations when explicitly available; connectivity is not used to invent a subtype label.",
             "Animated pulse fronts and event rasters are deterministic visualisations derived from the rate model; they are not recorded action potentials or measured conduction delays.",
         ],
     }

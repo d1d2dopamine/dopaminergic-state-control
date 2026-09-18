@@ -1,35 +1,58 @@
 # Data and provenance
 
-## Connectome
+## MaleCNS v1.0
 
-Pinned dataset: `male-cns:v1.0`.
+MaleCNS remains the primary discovery dataset. The pipeline uses the pinned public annotation/connectivity sources and the public `male-cns:v1.0` neuPrint dataset.
 
-The heavy GitHub Action downloads the official flat files for annotations, consensus neurotransmitters and neuron-to-neuron weights. Raw upstream files remain in the Actions cache and are not committed.
+Large raw MaleCNS tables stay in CI cache. Derived snapshots retain source URLs, hashes, thresholds and metadata provenance in `source.lock.json`, `snapshot_meta.json` and `run_manifest.json`.
 
-v0.4 keeps every weight >= 1 edge touching a consensus-dopamine neuron in the bounded snapshot. The primary analysis threshold remains configurable (default 3). During the same full-connectome scan the builder records target in-degree/in-strength at thresholds 1, 3, 5 and 10, allowing threshold robustness without another download.
+### Compact ROI metadata
 
-`snapshot_meta.json` records the edge floor, primary threshold, robustness thresholds, traced universe and anatomical-null coverage. `source.lock.json` records upstream URLs, byte sizes and SHA-256 hashes.
+v0.5 queries `bodyId`, `inputRois`, `outputRois`, and `roiInfo`.
 
-## Dopamine identity
+Some MaleCNS neuPrint neurons expose useful neuropil counts through `roiInfo` even when the explicit ROI arrays are empty. The loader therefore derives input ROIs from entries with positive `post` counts and output ROIs from entries with positive `pre` counts. Empty legacy ROI caches are rejected and replaced.
 
-`consensus_nt` defines transmitter identity. Raw transmitter prediction/confidence are provenance only.
+ROI overlap is only an availability control. It is not a physical contact model.
 
-## ROI availability
+### Compact identity metadata
 
-When the MaleCNS annotation export exposes `inputRois`/`outputRois`, those lists are normalised into the bounded snapshot. If only `roiInfo` is present, input/output ROI lists are derived from positive post/pre counts respectively.
+A separate small neuPrint cache stores:
 
-If the flat annotation file does not provide broad ROI coverage, the builder makes a fail-soft query to the pinned `male-cns:v1.0` neuPrint dataset for only `bodyId`, `inputRois` and `outputRois`. GitHub Actions caches that compact response as compressed JSON, so we do not download the 6.8 GB synaptic-partner table or 12.7 GB synapse-point table just to construct the availability null. If the query is unavailable, the run remains reproducible but affected convergence candidates are explicitly downgraded to `global_only`. `snapshot_meta.json` records the metadata source and coverage.
+- `flywireType`
+- `hemibrainType`
+- `supertype`
+- `itoleeHl`
+- `dimorphism`
+- `synonyms`
 
-For each snapshot target, CI computes the number of eligible traced neurons whose `outputRois` intersect the target's `inputRois`, plus the number of consensus-dopamine neurons inside that pool. These are the parameters for the v0.4 anatomical-availability null.
+These fields are used to resolve known PAM04 subtypes and cross-dataset identity. They are annotation evidence, not a new clustering result from this project.
 
-ROI overlap is intentionally described as availability, not contact probability.
+## BANC v888
 
-## 3D geometry
+Experiment 001 can download/cache the published BANC v888 per-neuron metadata and neuron-to-neuron v2 edge list.
 
-The viewer uses official MaleCNS geometry. It prefers the lightweight CI-derived LOD of the official `fullbrain-major-shells`; if that source cannot be built, the optimized ROI fallback remains available. Individual neurons use official v1.0 centerline skeletons in the same MaleCNS EM coordinate space.
+The metadata provide BANC `cell_type`, side, hemilineage, proofreading status and cross-dataset match fields, including Hemibrain and MaleCNS/FlyWire-related identities.
 
-## Synapse positions
+The v2 neuron edge list records `pre`, `post`, raw synapse `count`, normalized target input fraction, and source/target totals. v0.5 uses the raw count and applies `count >= 5`.
 
-For direct dopamine-input findings, `dsc synapse-sites` makes a best-effort query against the public MaleCNS neuPrint dataset. Returned coordinates are preserved in native dataset units and the manifest records the 8-nm-to-nm conversion used by the viewer/analysis.
+For connectivity-sensitive replication the analysis uses the strict `proofread == TRUE` PAM04 population. Raw BANC files remain in cache and are not copied into the research artifact/site.
 
-v0.4 also computes source-label spatial segregation on postsynaptic sites. This analysis only concerns the queried dopamine sources and is kept separate from the connectome discovery null.
+## FlyWire v783
+
+Experiment 001 can download/cache the public v783 annotation table and proofread neuron-neuron connectivity feather.
+
+The annotation table supplies `root_id`, `cell_type`, `hemibrain_type`, side and hemilineage fields.
+
+The connectivity file can contain separate rows for a neuron pair in different neuropils. v0.5 groups those rows by pre/post neuron before applying the connection threshold, then computes the same input-concentration metric used for BANC.
+
+Raw FlyWire files remain in cache and are not repackaged in release artifacts.
+
+## Cross-connectome comparability
+
+MaleCNS, BANC and FlyWire are different specimens, sexes/data releases, annotation systems and synapse-detection pipelines. Therefore v0.5 does **not** compare root IDs or treat raw synapse counts as identical physiological units.
+
+The replication target is a structural rule: whether an unusually concentrated PAM04 input profile persists within an explicitly known subtype and whether an outlier motif recurs bilaterally in independent adult connectomes.
+
+## Geometry and synapses
+
+MaleCNS State Lab continues to use official centerline skeletons and the official brain-shell geometry. Best-effort neuPrint synapse queries provide real candidate synapse coordinates. Simulated pulses/event ticks are never stored as measured physiology.
